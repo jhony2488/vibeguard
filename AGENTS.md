@@ -29,3 +29,10 @@ Greenfield. The repository currently contains specification/architecture documen
 - Every doc starts with a language-switcher line linking to its counterpart (`[English](...) · [Português](...)`).
 - ASCII diagrams and terminal output examples go inside `text` fenced blocks; shell examples use `bash`; config uses `json` (or `toml` for Codex).
 - MCP client-setup recipes live in `docs/04-mcp-server.md` — when adding a new client, add it to the summary table, give it a subsection with a copy-paste config, and mirror it in `docs/pt-BR/04-mcp-server.md`.
+- Contribution rules (≤20 files/PR, commit prefixes, required SSH-signed commits, mandatory doc sync) live in `CONTRIBUTING.md` + `CONTRIBUTING.pt-BR.md` at the root.
+
+## Tooling
+
+- ESLint 9 flat config (`eslint.config.js`), Prettier (`.prettierrc.json`), Husky hooks in `.husky/`: `pre-commit` → `npm run lint`, `pre-push` → `npm test`.
+- `.npmrc` sets `ignore-scripts=true`, so Husky's `prepare` does not auto-run — run `npx husky` once after `npm install` to enable the hooks. Do not weaken `.npmrc` security settings (`min-release-age`, `allow-git`).
+- `__tests__/fixtures/` is intentionally vulnerable code — excluded from ESLint.

@@ -66,3 +66,10 @@ Executable specifications in Gherkin describe every behavior in the docs — the
 - Cenários (Português): [`features/pt-BR/`](features/pt-BR/)
 
 These are spec-level scenarios — step definitions are wired up as the implementation lands.
+
+## Contributing
+
+Contributions are welcome — read the guide first (PR size limits, commit conventions, SSH-signed commits, bilingual doc rules):
+
+- [Contributing — English](CONTRIBUTING.md)
+- [Guia de contribuição — Português](CONTRIBUTING.pt-BR.md)
