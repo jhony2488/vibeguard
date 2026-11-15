@@ -49,29 +49,29 @@ VibeGuard operates as a security-analysis assistant that can be consumed at thre
 
 Every scan tool accepts optional model parameters so **the agent chooses the right model for the project context** — e.g., a secrets token-classifier on `.env`-ish files, an embedding model for similarity sweeps, or a code-tuned LLM for a TypeScript repo:
 
-| Param | Effect |
-| --- | --- |
-| `model` + `llmUrl` (+`llmKey`) | overrides the semantic-layer LLM for that call (OpenAI-compatible endpoint) |
+| Param                                | Effect                                                                                                                            |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `model` + `llmUrl` (+`llmKey`)       | overrides the semantic-layer LLM for that call (OpenAI-compatible endpoint)                                                       |
 | `classifierModel` + `classifierTask` | attaches a local HF classifier (`text-classification` / `token-classification` / `feature-extraction` via `@xenova/transformers`) |
 
 Each tool response includes `modelsUsed: { llm, classifier }` for transparency. Defaults come from the server env (`VIBEGUARD_LLM_*`, `VIBEGUARD_CLASSIFIER_*`).
 
-## Served Skills (roadmap — SEP-2640)
+## Served Skills (SEP-2640)
 
 Beyond tools, the official MCP **Skills extension** (`io.modelcontextprotocol/skills`, [SEP-2640](https://modelcontextprotocol.io/seps/2640-skills-extension), Final) lets a server ship Agent Skills — directories containing a `SKILL.md` plus supporting files — as MCP resources under `skill://` URIs. Servers implement `skills/list` and `skills/get`; clients read each file through `resources/read` (and optionally navigate directories via `resources/directory/read`).
 
-For VibeGuard, this is the canonical path to go from *detecting* flaws to *teaching the agent how to fix them* — remediation guidance versioned alongside the ruleset:
+For VibeGuard, this is the canonical path to go from _detecting_ flaws to _teaching the agent how to fix them_ — remediation guidance versioned alongside the ruleset:
 
-| Skill | Purpose |
-| --- | --- |
-| `fix-vibecoding-flaws` | Remediation playbooks per `VG-*` rule — secure rewrites and verification steps |
-| `secure-review-checklist` | Guided review workflow for agent-generated diffs |
+| Skill                     | Purpose                                                                        |
+| ------------------------- | ------------------------------------------------------------------------------ |
+| `fix-vibecoding-flaws`    | Remediation playbooks per `VG-*` rule — secure rewrites and verification steps |
+| `secure-review-checklist` | Guided review workflow for agent-generated diffs                               |
 
-Where `vibeguard_audit_diff` answers *"is this change safe?"*, a served skill answers *"how do I write it correctly?"* — e.g., after a finding, the agent loads the playbook for that rule instead of improvising a fix.
+Where `vibeguard_audit_diff` answers _"is this change safe?"_, a served skill answers _"how do I write it correctly?"_ — e.g., after a finding, the agent loads the playbook for that rule instead of improvising a fix.
 
 ### Skill directory layout
 
-Skills ship inside the `@vibeguard/mcp-server` package under `skills/`, one directory per skill — the directory name is the skill's `name`:
+Skills ship inside the `vibeguard` CLI package under `skills/`, one directory per skill — the directory name is the skill's `name`:
 
 ```text
 skills/
@@ -89,14 +89,14 @@ skills/
       pre-release.md          # project scan + git-history audit before shipping
 ```
 
-Each `SKILL.md` starts with YAML frontmatter (`name`, `description`, `metadata.version`); the body teaches the agent *when* to load the skill and *how* to navigate its supporting files — e.g., mapping a finding's `ruleId` to `rules/<ruleId>.md`:
+Each `SKILL.md` starts with YAML frontmatter (`name`, `description`, `metadata.version`); the body teaches the agent _when_ to load the skill and _how_ to navigate its supporting files — e.g., mapping a finding's `ruleId` to `rules/<ruleId>.md`:
 
 ```yaml
 ---
 name: fix-vibecoding-flaws
 description: Remediate VibeGuard findings. Use when a vibeguard_* tool reports a VG-* ruleId — loads the matching playbook for a secure rewrite and its verification steps.
 metadata:
-  version: "1.0.0"
+  version: '1.0.0'
 ---
 ```
 
@@ -104,10 +104,10 @@ metadata:
 
 Every file in a skill directory is exposed as an MCP resource — `skill://<skill-path>/<file-path>`:
 
-| File | Resource URI |
-| --- | --- |
-| `fix-vibecoding-flaws/SKILL.md` | `skill://fix-vibecoding-flaws/SKILL.md` |
-| `fix-vibecoding-flaws/rules/VG-SEC-001.md` | `skill://fix-vibecoding-flaws/rules/VG-SEC-001.md` |
+| File                                               | Resource URI                                               |
+| -------------------------------------------------- | ---------------------------------------------------------- |
+| `fix-vibecoding-flaws/SKILL.md`                    | `skill://fix-vibecoding-flaws/SKILL.md`                    |
+| `fix-vibecoding-flaws/rules/VG-SEC-001.md`         | `skill://fix-vibecoding-flaws/rules/VG-SEC-001.md`         |
 | `secure-review-checklist/checklists/agent-diff.md` | `skill://secure-review-checklist/checklists/agent-diff.md` |
 
 Relative references inside a `SKILL.md` (e.g., `rules/VG-SEC-001.md`) resolve against the skill's root directory, exactly as filesystem skills do.
@@ -127,12 +127,12 @@ VibeGuard declares the extension — plus `directoryRead`, so agents can browse 
 }
 ```
 
-| Method | Purpose |
-| --- | --- |
-| `skills/list` | Enumerates the served skills — each entry carries the verbatim `SKILL.md` frontmatter plus a complete `resources` manifest (`{uri, digest, size}` per file, SHA-256) |
-| `skills/get` | Returns a single skill's entry by `SKILL.md` URI — e.g., to refresh digests after a ruleset update |
-| `resources/read` | Base MCP read of any `skill://` file — how the agent actually fetches `SKILL.md` or a playbook |
-| `resources/directory/read` | Lists a directory's direct children (files, and subdirectories as `inode/directory`) — e.g., `skill://fix-vibecoding-flaws/rules` |
+| Method                     | Purpose                                                                                                                                                              |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `skills/list`              | Enumerates the served skills — each entry carries the verbatim `SKILL.md` frontmatter plus a complete `resources` manifest (`{uri, digest, size}` per file, SHA-256) |
+| `skills/get`               | Returns a single skill's entry by `SKILL.md` URI — e.g., to refresh digests after a ruleset update                                                                   |
+| `resources/read`           | Base MCP read of any `skill://` file — how the agent actually fetches `SKILL.md` or a playbook                                                                       |
+| `resources/directory/read` | Lists a directory's direct children (files, and subdirectories as `inode/directory`) — e.g., `skill://fix-vibecoding-flaws/rules`                                    |
 
 ```json
 {
@@ -158,7 +158,7 @@ VibeGuard declares the extension — plus `directoryRead`, so agents can browse 
 [ Agent applies the playbook's secure rewrite ──► re-runs audit_diff to verify ]
 ```
 
-> **Client support caveat:** the server only *serves* skill content — the host (Claude Code, Cursor, Devin, …) decides when to load it into model context and owns verification and approval: per SEP-2640's security model, skill content is untrusted input, digests guarantee consistency rather than trust, and persisted approvals are bound to the skill's file set. The SEP is Final, but host adoption is still ramping up, so this remains a roadmap item rather than a committed feature.
+> **Client support caveat:** the server only _serves_ skill content — the host (Claude Code, Cursor, Devin, …) decides when to load it into model context and owns verification and approval: per SEP-2640's security model, skill content is untrusted input, digests guarantee consistency rather than trust, and persisted approvals are bound to the skill's file set. The SEP is Final and the server implements the full extension; host adoption is still ramping up, so clients that don't negotiate it simply keep using the `vibeguard_*` tools.
 
 ## Per-Tool / IDE Integration
 
@@ -170,8 +170,8 @@ Add the MCP server to the environment config (`mcp.json` or Cursor settings):
 {
   "mcpServers": {
     "vibeguard": {
-      "command": "npx",
-      "args": ["-y", "@vibeguard/mcp-server"],
+      "command": "vibeguard",
+      "args": ["mcp"],
       "env": {
         "VIBEGUARD_LLM_URL": "https://api.openai.com",
         "VIBEGUARD_LLM_MODEL": "gpt-4o-mini",
@@ -204,23 +204,23 @@ npx vibeguard check --staged --strict
 
 - **Prevention at the source** — instead of discovering vibecoded-code errors during testing or production, the AI agent fixes the code at generation time.
 - **Optimized performance**:
-  - *Deterministic/probabilistic layers* run instantly in the client/IDE (<20ms) to block obvious flaws.
-  - *Semantic (LLM) layer* is invoked via MCP only for ambiguity or complex logical restructuring.
+  - _Deterministic/probabilistic layers_ run instantly in the client/IDE (<20ms) to block obvious flaws.
+  - _Semantic (LLM) layer_ is invoked via MCP only for ambiguity or complex logical restructuring.
 - **Full interoperability** — supporting the MCP standard makes VibeGuard compatible with Cursor, Devin, Claude Desktop, Windsurf, and any new agent or environment adopting the Anthropic spec.
 
 ## Connecting from Other MCP Clients
 
-The VibeGuard MCP server is a standard stdio server — any MCP-compatible client can run it via `npx -y @vibeguard/mcp-server`. The `VIBEGUARD_LLM_*` env vars are optional (omit the key entirely when using a local LLM such as Ollama at `http://localhost:11434`); `VIBEGUARD_CLASSIFIER_MODEL` enables the optional local HF classifier layer (`npm i @xenova/transformers` required).
+The VibeGuard MCP server is a standard stdio server served by the same global binary as the CLI — install once (`npm i -g vibeguard-cli`) and point any MCP-compatible client at `vibeguard mcp` (or `npx -y vibeguard-cli mcp` without a global install). The `VIBEGUARD_LLM_*` env vars are optional (omit the key entirely when using a local LLM such as Ollama at `http://localhost:11434`); `VIBEGUARD_CLASSIFIER_MODEL` enables the optional local HF classifier layer (`npm i @xenova/transformers` required).
 
-| Client | Config file / method |
-| --- | --- |
-| Claude Desktop | `claude_desktop_config.json` |
-| Claude Code | `claude mcp add` / `.mcp.json` |
-| Codex CLI (ChatGPT) | `~/.codex/config.toml` |
-| Windsurf | `~/.codeium/windsurf/mcp_config.json` |
-| VS Code | `.vscode/mcp.json` |
-| Zed | `settings.json` → `context_servers` |
-| Gemini CLI | `~/.gemini/settings.json` |
+| Client              | Config file / method                  |
+| ------------------- | ------------------------------------- |
+| Claude Desktop      | `claude_desktop_config.json`          |
+| Claude Code         | `claude mcp add` / `.mcp.json`        |
+| Codex CLI (ChatGPT) | `~/.codex/config.toml`                |
+| Windsurf            | `~/.codeium/windsurf/mcp_config.json` |
+| VS Code             | `.vscode/mcp.json`                    |
+| Zed                 | `settings.json` → `context_servers`   |
+| Gemini CLI          | `~/.gemini/settings.json`             |
 
 ### Claude Desktop
 
@@ -233,8 +233,8 @@ Edit `claude_desktop_config.json`:
 {
   "mcpServers": {
     "vibeguard": {
-      "command": "npx",
-      "args": ["-y", "@vibeguard/mcp-server"],
+      "command": "vibeguard",
+      "args": ["mcp"],
       "env": { "VIBEGUARD_LLM_KEY": "your-api-key" }
     }
   }
@@ -247,10 +247,10 @@ Restart Claude Desktop — the `vibeguard_*` tools appear in the tools menu.
 
 ```bash
 # Project-scoped (writes .mcp.json) — shared with the team via git
-claude mcp add vibeguard -- npx -y @vibeguard/mcp-server
+claude mcp add vibeguard -- vibeguard mcp
 
 # User-scoped — available in every project
-claude mcp add --scope user vibeguard -- npx -y @vibeguard/mcp-server
+claude mcp add --scope user vibeguard -- vibeguard mcp
 ```
 
 Or commit a `.mcp.json` in the project root using the same `mcpServers` JSON shape as above.
@@ -261,8 +261,8 @@ Codex uses TOML — edit `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.vibeguard]
-command = "npx"
-args = ["-y", "@vibeguard/mcp-server"]
+command = "vibeguard"
+args = ["mcp"]
 
 [mcp_servers.vibeguard.env]
 VIBEGUARD_LLM_KEY = "your-api-key"
@@ -278,8 +278,8 @@ Edit `~/.codeium/windsurf/mcp_config.json` (Windows: `C:\Users\<you>\.codeium\wi
 {
   "mcpServers": {
     "vibeguard": {
-      "command": "npx",
-      "args": ["-y", "@vibeguard/mcp-server"],
+      "command": "vibeguard",
+      "args": ["mcp"],
       "env": { "VIBEGUARD_LLM_KEY": "your-api-key" }
     }
   }
@@ -294,8 +294,8 @@ Create `.vscode/mcp.json` in the workspace — note the key is **`servers`**, no
 {
   "servers": {
     "vibeguard": {
-      "command": "npx",
-      "args": ["-y", "@vibeguard/mcp-server"],
+      "command": "vibeguard",
+      "args": ["mcp"],
       "env": { "VIBEGUARD_LLM_KEY": "your-api-key" }
     }
   }
@@ -311,8 +311,8 @@ In `settings.json`, use `context_servers` — the command lives under `command.p
   "context_servers": {
     "vibeguard": {
       "command": {
-        "path": "npx",
-        "args": ["-y", "@vibeguard/mcp-server"],
+        "path": "vibeguard",
+        "args": ["mcp"],
         "env": { "VIBEGUARD_LLM_KEY": "your-api-key" }
       }
     }
@@ -328,8 +328,8 @@ Edit `~/.gemini/settings.json`:
 {
   "mcpServers": {
     "vibeguard": {
-      "command": "npx",
-      "args": ["-y", "@vibeguard/mcp-server"],
+      "command": "vibeguard",
+      "args": ["mcp"],
       "env": { "VIBEGUARD_LLM_KEY": "your-api-key" }
     }
   }

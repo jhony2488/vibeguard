@@ -33,13 +33,14 @@ LLM provider and local HF classifiers are pluggable — see [LLM & Local-Model C
 
 ## Commands
 
-| Command | Description |
-| --- | --- |
-| `vibeguard check` | General audit (deterministic + probabilistic + LLM layers) |
-| `vibeguard check --deep` | Deep audit — forces the LLM semantic pass on priority files |
-| `vibeguard check --deps` | Dependency-tree scan only (hallucinated/phantom packages) |
-| `vibeguard watch` | Continuous file-watcher mode with live notifications |
-| `vibeguard audit-history` | Scans git history for leaked secrets & hallucinated deps |
+| Command                   | Description                                                  |
+| ------------------------- | ------------------------------------------------------------ |
+| `vibeguard check`         | General audit (deterministic + probabilistic + LLM layers)   |
+| `vibeguard check --deep`  | Deep audit — forces the LLM semantic pass on priority files  |
+| `vibeguard check --deps`  | Dependency-tree scan only (hallucinated/phantom packages)    |
+| `vibeguard watch`         | Continuous file-watcher mode with live notifications         |
+| `vibeguard audit-history` | Scans git history for leaked secrets & hallucinated deps     |
+| `vibeguard mcp`           | Runs VibeGuard as a stdio MCP server (tools + Served Skills) |
 
 ## Documentation
 
@@ -48,18 +49,18 @@ LLM provider and local HF classifiers are pluggable — see [LLM & Local-Model C
 
 ## MCP Integrations
 
-VibeGuard runs as a standard stdio MCP server — `npx -y @vibeguard/mcp-server`. Per-client setup recipes:
+VibeGuard runs as a standard stdio MCP server through the same global binary — `npm i -g vibeguard-cli`, then `vibeguard mcp` (or `npx -y vibeguard-cli mcp`). Per-client setup recipes:
 
-| Client | Config |
-| --- | --- |
-| Claude Desktop | `claude_desktop_config.json` |
-| Claude Code | `claude mcp add` / `.mcp.json` |
-| Codex CLI (ChatGPT) | `~/.codex/config.toml` |
-| Cursor / Devin | `mcp.json` |
-| Windsurf | `~/.codeium/windsurf/mcp_config.json` |
-| VS Code | `.vscode/mcp.json` |
-| Zed | `settings.json` → `context_servers` |
-| Gemini CLI | `~/.gemini/settings.json` |
+| Client              | Config                                |
+| ------------------- | ------------------------------------- |
+| Claude Desktop      | `claude_desktop_config.json`          |
+| Claude Code         | `claude mcp add` / `.mcp.json`        |
+| Codex CLI (ChatGPT) | `~/.codex/config.toml`                |
+| Cursor / Devin      | `mcp.json`                            |
+| Windsurf            | `~/.codeium/windsurf/mcp_config.json` |
+| VS Code             | `.vscode/mcp.json`                    |
+| Zed                 | `settings.json` → `context_servers`   |
+| Gemini CLI          | `~/.gemini/settings.json`             |
 
 Full instructions: [docs/04-mcp-server.md](docs/04-mcp-server.md) · [pt-BR](docs/pt-BR/04-mcp-server.md)
 

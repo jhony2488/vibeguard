@@ -53,9 +53,16 @@ src/git/history.js      → auditHistory({ cwd, maxCommits, secretsOnly, checkPe
 src/a11y.js             → checkA11y(code, ctx) → Finding[]
 src/performance.js      → checkPerformance(code, ctx) → Finding[]
 src/report/index.js     → toJson(report) → object; toSarif(report) → object; renderTerminal(report) → string
-src/mcp/server.js       → createMcpServer(deps) → { tools: string[], handleCall(name, params) }
+src/mcp/server.js       → createMcpServer(deps) → { tools: string[], capabilities, serverInfo,
+                          handleCall(name, params), handleRequest(method, params), skills() }
                           scan tools accept per-call { model, llmUrl, llmKey, classifierModel, classifierTask }
                           and report modelsUsed: { llm, classifier }
+src/mcp/stdio.js        → runStdioServer(server, { input, output }) → { done }
+                          newline-delimited JSON-RPC 2.0; RPC_ERRORS, rpcError(code, msg)
+src/mcp/skills.js       → loadSkills(skillsDir, io) → SkillEntry[] ({name, description, metadata,
+                          uri, resources:[{uri,digest,size,mimeType}]})
+                          resolveSkillUri(uri, skills, skillsDir) → { skill, filePath, rel } | null
+                          readSkillResource / readSkillDirectory · parseFrontmatter · SKILL_SCHEME
 ```
 
 ### Finding shape
@@ -86,19 +93,19 @@ type Finding = {
 Every test name mirrors its Gherkin scenario and carries a
 `// features/<file>.feature — "<scenario>"` comment. Coverage map:
 
-| Feature file | Test file(s) |
-| --- | --- |
-| `deterministic-scan.feature` | `unit/secret-patterns`, `unit/ast-rules`, `unit/registry-check` |
-| `probabilistic-scan.feature` | `unit/entropy-anomaly-taint` |
-| `semantic-audit.feature` | `unit/semantic` |
-| `severity.feature` | `unit/severity` |
-| `cli-commands.feature` | `unit/cli-args`, `unit/report`, `integration/cli` |
-| `terminal-ui.feature` | `unit/report` |
-| `mcp-server.feature` | `integration/mcp-tools` |
-| `watch-mode.feature` | `unit/watcher`, `integration/watch-flow` |
-| `git-history-audit.feature` | `integration/git-history` |
-| `a11y-performance.feature` | `unit/a11y-performance` |
-| `privacy.feature` | `unit/sanitize`, `integration/scan-pipeline` |
+| Feature file                 | Test file(s)                                                        |
+| ---------------------------- | ------------------------------------------------------------------- |
+| `deterministic-scan.feature` | `unit/secret-patterns`, `unit/ast-rules`, `unit/registry-check`     |
+| `probabilistic-scan.feature` | `unit/entropy-anomaly-taint`                                        |
+| `semantic-audit.feature`     | `unit/semantic`                                                     |
+| `severity.feature`           | `unit/severity`                                                     |
+| `cli-commands.feature`       | `unit/cli-args`, `unit/report`, `integration/cli`                   |
+| `terminal-ui.feature`        | `unit/report`                                                       |
+| `mcp-server.feature`         | `unit/mcp-skills`, `integration/mcp-tools`, `integration/mcp-stdio` |
+| `watch-mode.feature`         | `unit/watcher`, `integration/watch-flow`                            |
+| `git-history-audit.feature`  | `integration/git-history`                                           |
+| `a11y-performance.feature`   | `unit/a11y-performance`                                             |
+| `privacy.feature`            | `unit/sanitize`, `integration/scan-pipeline`                        |
 
 ## Layout
 

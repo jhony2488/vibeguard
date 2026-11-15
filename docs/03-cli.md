@@ -4,17 +4,18 @@
 
 ## Commands
 
-| Command | Description |
-| --- | --- |
-| `vibeguard check` | General scan — audits the current directory (or a given path) with the configured analysis layers |
-| `vibeguard check --deep` | Deep audit — forces priority files through the LLM layer for full semantic analysis |
-| `vibeguard check --deps` | Dependency-focused scan — mitigates phantom/hallucinated dependency risk |
-| `vibeguard check --all` | Combined audit — security + accessibility + performance |
-| `vibeguard check --focus=perf,a11y` | Scoped audit on specific domains |
-| `vibeguard check --history-only` | Only the git-history/leaked-secrets scan |
-| `vibeguard check --staged --strict` | CI/pre-commit mode on staged changes |
-| `vibeguard watch` | Continuous monitoring daemon — see [05 — Watch & History](./05-watch-and-history.md) |
-| `vibeguard audit-history` | Historical commit scan — see [05 — Watch & History](./05-watch-and-history.md) |
+| Command                             | Description                                                                                               |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `vibeguard check`                   | General scan — audits the current directory (or a given path) with the configured analysis layers         |
+| `vibeguard check --deep`            | Deep audit — forces priority files through the LLM layer for full semantic analysis                       |
+| `vibeguard check --deps`            | Dependency-focused scan — mitigates phantom/hallucinated dependency risk                                  |
+| `vibeguard check --all`             | Combined audit — security + accessibility + performance                                                   |
+| `vibeguard check --focus=perf,a11y` | Scoped audit on specific domains                                                                          |
+| `vibeguard check --history-only`    | Only the git-history/leaked-secrets scan                                                                  |
+| `vibeguard check --staged --strict` | CI/pre-commit mode on staged changes                                                                      |
+| `vibeguard watch`                   | Continuous monitoring daemon — see [05 — Watch & History](./05-watch-and-history.md)                      |
+| `vibeguard audit-history`           | Historical commit scan — see [05 — Watch & History](./05-watch-and-history.md)                            |
+| `vibeguard mcp`                     | Serve VibeGuard as a stdio MCP server (tools + Served Skills) — see [04 — MCP Server](./04-mcp-server.md) |
 
 ## Output Formats
 
@@ -26,11 +27,11 @@ VibeGuard provides multiple formats for different development workflows:
 
 ## Output Modes
 
-| Flag | Mode |
-| --- | --- |
-| `--interactive` (default) | Opens prompts letting the user fix the issue on the spot, ignore the warning, or view details |
-| `--format json` | Machine-readable output for CI pipelines — the build can fail if the security score drops below the accepted threshold |
-| `--report` | Generates a static report file for sharing |
+| Flag                      | Mode                                                                                                                   |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `--interactive` (default) | Opens prompts letting the user fix the issue on the spot, ignore the warning, or view details                          |
+| `--format json`           | Machine-readable output for CI pipelines — the build can fail if the security score drops below the accepted threshold |
+| `--report`                | Generates a static report file for sharing                                                                             |
 
 ## LLM & Local-Model Configuration
 
@@ -40,13 +41,13 @@ VibeGuard's semantic layer (Layer 3) and optional local classifiers (Layer 2.5) 
 
 The HTTP client speaks OpenAI-compatible **Chat Completions** (`POST {url}/v1/chat/completions`) — one configuration covers local servers and remote APIs:
 
-| Provider | `--llm-url` example | Key |
-| --- | --- | --- |
-| Ollama | `http://localhost:11434` | — |
-| LM Studio | `http://localhost:1234` | — |
-| vLLM / llama.cpp server | `http://your-host:8000` | — |
-| OpenAI | `https://api.openai.com` | `VIBEGUARD_LLM_KEY` |
-| Groq / OpenRouter / Mistral / DeepSeek | provider base URL | provider key |
+| Provider                               | `--llm-url` example      | Key                 |
+| -------------------------------------- | ------------------------ | ------------------- |
+| Ollama                                 | `http://localhost:11434` | —                   |
+| LM Studio                              | `http://localhost:1234`  | —                   |
+| vLLM / llama.cpp server                | `http://your-host:8000`  | —                   |
+| OpenAI                                 | `https://api.openai.com` | `VIBEGUARD_LLM_KEY` |
+| Groq / OpenRouter / Mistral / DeepSeek | provider base URL        | provider key        |
 
 ```bash
 # Local model — nothing leaves the machine
@@ -59,11 +60,11 @@ npx vibeguard check --deep \
   --llm-key "$VIBEGUARD_LLM_KEY"
 ```
 
-| Source | Vars |
-| --- | --- |
-| Flags | `--llm-url`, `--llm-model`, `--llm-key` |
-| Env | `VIBEGUARD_LLM_URL`, `VIBEGUARD_LLM_MODEL`, `VIBEGUARD_LLM_KEY` (fallbacks: `OPENAI_BASE_URL`/`OPENAI_API_KEY`/`OPENAI_MODEL`, `OLLAMA_HOST`) |
-| File | `.vibeguardrc` (JSON) in project or home dir: `{ "llm": { "url": "...", "model": "...", "apiKey": "..." } }` |
+| Source | Vars                                                                                                                                          |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Flags  | `--llm-url`, `--llm-model`, `--llm-key`                                                                                                       |
+| Env    | `VIBEGUARD_LLM_URL`, `VIBEGUARD_LLM_MODEL`, `VIBEGUARD_LLM_KEY` (fallbacks: `OPENAI_BASE_URL`/`OPENAI_API_KEY`/`OPENAI_MODEL`, `OLLAMA_HOST`) |
+| File   | `.vibeguardrc` (JSON) in project or home dir: `{ "llm": { "url": "...", "model": "...", "apiKey": "..." } }`                                  |
 
 Precedence: **flag > env > rc file**. Prefer env vars or the rc file over `--llm-key` — argv is visible in process listings. Local URLs (localhost, `127.*`, `::1`, RFC1918, `.local`) are detected automatically: remote providers get sanitized snippets; local ones receive raw code.
 
