@@ -90,6 +90,134 @@ npx vibeguard check --staged --strict
   - *Semantic (LLM) layer* is invoked via MCP only for ambiguity or complex logical restructuring.
 - **Full interoperability** — supporting the MCP standard makes VibeGuard compatible with Cursor, Devin, Claude Desktop, Windsurf, and any new agent or environment adopting the Anthropic spec.
 
+## Connecting from Other MCP Clients
+
+The VibeGuard MCP server is a standard stdio server — any MCP-compatible client can run it via `npx -y @vibeguard/mcp-server`. The `VIBEGUARD_LLM_KEY` env var is optional (omit it when using a local LLM such as Ollama).
+
+| Client | Config file / method |
+| --- | --- |
+| Claude Desktop | `claude_desktop_config.json` |
+| Claude Code | `claude mcp add` / `.mcp.json` |
+| Codex CLI (ChatGPT) | `~/.codex/config.toml` |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` |
+| VS Code | `.vscode/mcp.json` |
+| Zed | `settings.json` → `context_servers` |
+| Gemini CLI | `~/.gemini/settings.json` |
+
+### Claude Desktop
+
+Edit `claude_desktop_config.json`:
+
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "vibeguard": {
+      "command": "npx",
+      "args": ["-y", "@vibeguard/mcp-server"],
+      "env": { "VIBEGUARD_LLM_KEY": "your-api-key" }
+    }
+  }
+}
+```
+
+Restart Claude Desktop — the `vibeguard_*` tools appear in the tools menu.
+
+### Claude Code
+
+```bash
+# Project-scoped (writes .mcp.json) — shared with the team via git
+claude mcp add vibeguard -- npx -y @vibeguard/mcp-server
+
+# User-scoped — available in every project
+claude mcp add --scope user vibeguard -- npx -y @vibeguard/mcp-server
+```
+
+Or commit a `.mcp.json` in the project root using the same `mcpServers` JSON shape as above.
+
+### Codex CLI (ChatGPT)
+
+Codex uses TOML — edit `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.vibeguard]
+command = "npx"
+args = ["-y", "@vibeguard/mcp-server"]
+
+[mcp_servers.vibeguard.env]
+VIBEGUARD_LLM_KEY = "your-api-key"
+```
+
+> **Note:** ChatGPT on the web does not support local stdio MCP servers — it only supports remote HTTP connectors. Codex CLI is the recommended path for ChatGPT/OpenAI workflows.
+
+### Windsurf
+
+Edit `~/.codeium/windsurf/mcp_config.json` (Windows: `C:\Users\<you>\.codeium\windsurf\mcp_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "vibeguard": {
+      "command": "npx",
+      "args": ["-y", "@vibeguard/mcp-server"],
+      "env": { "VIBEGUARD_LLM_KEY": "your-api-key" }
+    }
+  }
+}
+```
+
+### VS Code (Copilot Agent Mode)
+
+Create `.vscode/mcp.json` in the workspace — note the key is **`servers`**, not `mcpServers`:
+
+```json
+{
+  "servers": {
+    "vibeguard": {
+      "command": "npx",
+      "args": ["-y", "@vibeguard/mcp-server"],
+      "env": { "VIBEGUARD_LLM_KEY": "your-api-key" }
+    }
+  }
+}
+```
+
+### Zed
+
+In `settings.json`, use `context_servers` — the command lives under `command.path`/`command.args`:
+
+```json
+{
+  "context_servers": {
+    "vibeguard": {
+      "command": {
+        "path": "npx",
+        "args": ["-y", "@vibeguard/mcp-server"],
+        "env": { "VIBEGUARD_LLM_KEY": "your-api-key" }
+      }
+    }
+  }
+}
+```
+
+### Gemini CLI
+
+Edit `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "vibeguard": {
+      "command": "npx",
+      "args": ["-y", "@vibeguard/mcp-server"],
+      "env": { "VIBEGUARD_LLM_KEY": "your-api-key" }
+    }
+  }
+}
+```
+
 ## Test Scenarios
 
 BDD scenarios covering this document live in [`features/`](../features/):

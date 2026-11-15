@@ -20,4 +20,5 @@ Greenfield. The repository currently contains specification/architecture documen
 
 - Markdown docs use numbered prefixes (`01-`, `02-`, …) to enforce reading order.
 - Every doc starts with a language-switcher line linking to its counterpart (`[English](...) · [Português](...)`).
-- ASCII diagrams and terminal output examples go inside `text` fenced blocks; shell examples use `bash`; config uses `json`.
+- ASCII diagrams and terminal output examples go inside `text` fenced blocks; shell examples use `bash`; config uses `json` (or `toml` for Codex).
+- MCP client-setup recipes live in `docs/04-mcp-server.md` — when adding a new client, add it to the summary table, give it a subsection with a copy-paste config, and mirror it in `docs/pt-BR/04-mcp-server.md`.
