@@ -17,4 +17,4 @@ Specification and architecture documentation for the VibeGuard CLI — a layered
 
 ## BDD Test Scenarios
 
-Executable specifications (Gherkin) for the behavior described in these docs live in [`features/`](../features/), with a Portuguese mirror in [`features/pt-BR/`](../features/pt-BR/). Each doc links to its corresponding `.feature` files at the bottom.
+Executable specifications (Gherkin) for the behavior described in these docs live in [`features/`](../features/), with a Portuguese mirror in [`features/pt-BR/`](../features/pt-BR/). Each doc links to its corresponding `.feature` files at the bottom — and the Jest suite in [`__tests__/`](../__tests__/) is the executable implementation of those scenarios (see [`__tests__/README.md`](../__tests__/README.md) for the `src/` contract).

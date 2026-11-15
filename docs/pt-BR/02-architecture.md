@@ -50,6 +50,8 @@ Diferente da primeira camada, a camada probabilística lida com incertezas e des
 - **Pontuação de anomalia de código** — avalia a estrutura de blocos e funções. Funções excessivamente longas, empilhamento incomum de promessas assíncronas ou cadeias de tratamento de exceções vazias sobem a pontuação de risco daquele trecho específico.
 - **Análise heurística de fluxo (taint estimation)** — estima estatisticamente se variáveis vindas de requisições de usuários alcançam pontos sensíveis (como chamadas de banco de dados ou escrita em disco) sem passarem por etapas visíveis de sanitização.
 
+> **Modelos locais opcionais (Camada 2.5):** classificadores e modelos de embedding plugáveis do Hugging Face (via `@xenova/transformers`, totalmente no dispositivo) podem enriquecer esta camada — detectores de segredos/PII, classificadores de injeção e embeddings de similaridade de código — selecionáveis por scan ou por chamada de tool MCP.
+
 ## Camada 3: Raciocínio Semântico via LLM
 
 A terceira camada é acionada prioritariamente para trechos sinalizados pelas camadas anteriores ou para varreduras profundas configuradas pelo usuário. Ela utiliza modelos de linguagem (locais via Ollama/vLLM ou remotos via API) para compreender a real intenção e o contexto do código.

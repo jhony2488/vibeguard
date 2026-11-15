@@ -32,6 +32,59 @@ VibeGuard provides multiple formats for different development workflows:
 | `--format json` | Machine-readable output for CI pipelines — the build can fail if the security score drops below the accepted threshold |
 | `--report` | Generates a static report file for sharing |
 
+## LLM & Local-Model Configuration
+
+VibeGuard's semantic layer (Layer 3) and optional local classifiers (Layer 2.5) are pluggable — no model is required for the default scan.
+
+### LLM provider (any OpenAI-compatible API)
+
+The HTTP client speaks OpenAI-compatible **Chat Completions** (`POST {url}/v1/chat/completions`) — one configuration covers local servers and remote APIs:
+
+| Provider | `--llm-url` example | Key |
+| --- | --- | --- |
+| Ollama | `http://localhost:11434` | — |
+| LM Studio | `http://localhost:1234` | — |
+| vLLM / llama.cpp server | `http://your-host:8000` | — |
+| OpenAI | `https://api.openai.com` | `VIBEGUARD_LLM_KEY` |
+| Groq / OpenRouter / Mistral / DeepSeek | provider base URL | provider key |
+
+```bash
+# Local model — nothing leaves the machine
+npx vibeguard check --deep --llm-url http://localhost:11434 --llm-model codellama
+
+# Remote provider — snippets are sanitized (secrets/IPs/PII masked) before sending
+npx vibeguard check --deep \
+  --llm-url https://api.openai.com \
+  --llm-model gpt-4o-mini \
+  --llm-key "$VIBEGUARD_LLM_KEY"
+```
+
+| Source | Vars |
+| --- | --- |
+| Flags | `--llm-url`, `--llm-model`, `--llm-key` |
+| Env | `VIBEGUARD_LLM_URL`, `VIBEGUARD_LLM_MODEL`, `VIBEGUARD_LLM_KEY` (fallbacks: `OPENAI_BASE_URL`/`OPENAI_API_KEY`/`OPENAI_MODEL`, `OLLAMA_HOST`) |
+| File | `.vibeguardrc` (JSON) in project or home dir: `{ "llm": { "url": "...", "model": "...", "apiKey": "..." } }` |
+
+Precedence: **flag > env > rc file**. Prefer env vars or the rc file over `--llm-key` — argv is visible in process listings. Local URLs (localhost, `127.*`, `::1`, RFC1918, `.local`) are detected automatically: remote providers get sanitized snippets; local ones receive raw code.
+
+### Local classifiers & embeddings (optional)
+
+Lightweight Hugging Face models can run **fully on-device** via [`@xenova/transformers`](https://github.com/xenova/transformers.js) — useful when you want semantic-ish detection without an LLM at all:
+
+```bash
+npm install @xenova/transformers
+
+npx vibeguard check \
+  --classifier-model <hf-model-id> \
+  --classifier-task text-classification   # or token-classification / feature-extraction
+```
+
+- `--classifier-model` (env `VIBEGUARD_CLASSIFIER_MODEL`) — any HF model id transformers.js can load (secret/PII detectors, prompt-injection classifiers, code-embedding models for similarity sweeps).
+- `--classifier-task` (env `VIBEGUARD_CLASSIFIER_TASK`) — defaults to `text-classification`.
+- `--no-classifier` — force-disable.
+
+Classifier findings merge into the probabilistic layer as `Classifier: <label>` findings. In the MCP server, agents can pass `model`/`llmUrl`/`classifierModel`/`classifierTask` **per tool call** — so the agent picks the right model for the project's context (see [04 — MCP Server](./04-mcp-server.md)).
+
 ## Terminal UI
 
 Instead of cryptic JSON or a giant wall of text, the CLI uses modern terminal-formatting libraries (chalk, ora, cli-table3, ink/enquirer) to structure the report into friendly visual blocks.

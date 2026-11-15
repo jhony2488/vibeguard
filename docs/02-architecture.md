@@ -50,6 +50,8 @@ Unlike the first layer, the probabilistic layer deals with uncertainty and stati
 - **Code anomaly scoring** — evaluates block and function structure. Overly long functions, unusual async-promise stacking, or empty exception-handling chains raise the risk score of that specific snippet.
 - **Heuristic flow analysis (taint estimation)** — statistically estimates whether variables sourced from user requests reach sensitive sinks (database calls, disk writes) without passing through visible sanitization steps.
 
+> **Optional local models (Layer 2.5):** pluggable Hugging Face classifiers and embedding models (via `@xenova/transformers`, fully on-device) can enrich this layer — secret/PII detectors, injection classifiers, and code-similarity embeddings — selected per scan or per MCP tool call.
+
 ## Layer 3: Semantic Reasoning via LLM
 
 Triggered primarily for snippets flagged by the previous layers or for user-configured deep scans. It uses language models — local via Ollama/vLLM or remote via API — to understand the code's real intent and context.

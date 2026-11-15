@@ -32,6 +32,59 @@ O sistema disponibiliza múltiplos formatos para integração com diferentes flu
 | `--format json` | Saída legível por máquina para pipelines — o build pode falhar caso o score de segurança fique abaixo do aceitável |
 | `--report` | Gera um arquivo de relatório estático para compartilhamento |
 
+## Configuração de LLM e Modelos Locais
+
+A camada semântica do VibeGuard (Camada 3) e os classificadores locais opcionais (Camada 2.5) são plugáveis — nenhum modelo é obrigatório para o scan padrão.
+
+### Provedor LLM (qualquer API compatível com OpenAI)
+
+O cliente HTTP fala **Chat Completions** compatível com OpenAI (`POST {url}/v1/chat/completions`) — uma única configuração cobre servidores locais e APIs remotas:
+
+| Provedor | Exemplo de `--llm-url` | Chave |
+| --- | --- | --- |
+| Ollama | `http://localhost:11434` | — |
+| LM Studio | `http://localhost:1234` | — |
+| vLLM / servidor llama.cpp | `http://seu-host:8000` | — |
+| OpenAI | `https://api.openai.com` | `VIBEGUARD_LLM_KEY` |
+| Groq / OpenRouter / Mistral / DeepSeek | URL base do provedor | chave do provedor |
+
+```bash
+# Modelo local — nada sai da máquina
+npx vibeguard check --deep --llm-url http://localhost:11434 --llm-model codellama
+
+# Provedor remoto — snippets são sanitizados (segredos/IPs/PII mascarados) antes do envio
+npx vibeguard check --deep \
+  --llm-url https://api.openai.com \
+  --llm-model gpt-4o-mini \
+  --llm-key "$VIBEGUARD_LLM_KEY"
+```
+
+| Origem | Variáveis |
+| --- | --- |
+| Flags | `--llm-url`, `--llm-model`, `--llm-key` |
+| Env | `VIBEGUARD_LLM_URL`, `VIBEGUARD_LLM_MODEL`, `VIBEGUARD_LLM_KEY` (fallbacks: `OPENAI_BASE_URL`/`OPENAI_API_KEY`/`OPENAI_MODEL`, `OLLAMA_HOST`) |
+| Arquivo | `.vibeguardrc` (JSON) no projeto ou no home: `{ "llm": { "url": "...", "model": "...", "apiKey": "..." } }` |
+
+Precedência: **flag > env > arquivo rc**. Prefira variáveis de ambiente ou o rc em vez de `--llm-key` — argv fica visível em listagens de processos. URLs locais (localhost, `127.*`, `::1`, RFC1918, `.local`) são detectadas automaticamente: provedores remotos recebem snippets sanitizados; locais recebem o código bruto.
+
+### Classificadores e embeddings locais (opcional)
+
+Modelos leves do Hugging Face podem rodar **totalmente no dispositivo** via [`@xenova/transformers`](https://github.com/xenova/transformers.js) — útil para detecção "semântica" sem nenhum LLM:
+
+```bash
+npm install @xenova/transformers
+
+npx vibeguard check \
+  --classifier-model <hf-model-id> \
+  --classifier-task text-classification   # ou token-classification / feature-extraction
+```
+
+- `--classifier-model` (env `VIBEGUARD_CLASSIFIER_MODEL`) — qualquer id de modelo HF que o transformers.js consiga carregar (detectores de segredos/PII, classificadores de prompt-injection, modelos de embedding de código para varreduras por similaridade).
+- `--classifier-task` (env `VIBEGUARD_CLASSIFIER_TASK`) — padrão `text-classification`.
+- `--no-classifier` — força a desativação.
+
+Os findings do classificador entram na camada probabilística como `Classifier: <label>`. No servidor MCP, agentes podem passar `model`/`llmUrl`/`classifierModel`/`classifierTask` **por chamada de tool** — o agente escolhe o modelo certo para o contexto do projeto (veja [04 — Servidor MCP](./04-mcp-server.md)).
+
 ## Experiência Visual no Terminal
 
 Em vez de devolver um JSON críptico ou um bloco gigante de texto, o modo CLI utiliza bibliotecas modernas de formatação de terminal (chalk, ora, cli-table3, ink/enquirer) para estruturar o relatório em blocos visuais amigáveis.

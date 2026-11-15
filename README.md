@@ -19,12 +19,17 @@ Vibecoded systems tend to ship characteristic vulnerability patterns:
 # Full audit of the current project
 npx vibeguard check
 
+# Deep audit with a local LLM (Ollama) or any OpenAI-compatible endpoint
+npx vibeguard check --deep --llm-url http://localhost:11434 --llm-model codellama
+
 # Continuous monitoring (watch mode)
 npx vibeguard watch
 
 # Scan git history for leaked secrets
 npx vibeguard audit-history --commits 100
 ```
+
+LLM provider and local HF classifiers are pluggable — see [LLM & Local-Model Configuration](docs/03-cli.md#llm--local-model-configuration).
 
 ## Commands
 
@@ -65,7 +70,13 @@ Executable specifications in Gherkin describe every behavior in the docs — the
 - Scenarios (English): [`features/`](features/)
 - Cenários (Português): [`features/pt-BR/`](features/pt-BR/)
 
-These are spec-level scenarios — step definitions are wired up as the implementation lands.
+The executable counterpart lives in [`__tests__/`](__tests__/) — a Jest suite (ESM) where every test traces back to a Gherkin scenario:
+
+```bash
+npm install
+npm test          # 146 tests — unit + integration
+npm run cli       # run the CLI from source
+```
 
 ## Contributing
 

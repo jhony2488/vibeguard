@@ -2,7 +2,17 @@
 
 ## Project Status
 
-Greenfield. The repository currently contains specification/architecture documentation only — the codebase (Node.js CLI) is not yet implemented. Treat `docs/` as the source of truth for intended behavior.
+Implemented — `src/` contains a working zero-dependency CLI (`npm run cli`, bin `vibeguard`) and the full suite is green (`npm test` — 146 tests, 18 suites). `docs/` remains the spec source of truth; the test contract lives in `__tests__/README.md`.
+
+## Source Layout (`src/`)
+
+- `cli.js` — `parseArgs` + `main` (check / watch / audit-history), output formats, exit codes
+- `scanner.js` — project/file orchestration; injectable `llm`, `classifier`, `registryClient`
+- `layers/` — `deterministic.js` (secrets/CORS/eval/TLS + registry checks), `probabilistic.js` (entropy, anomaly, taint), `semantic.js` (LLM delegation), `llm.js` (OpenAI-compatible `createHttpLlm`, `isLocalUrl`, `resolveLlmConfig`/`loadLlm`, offline `createLocalEchoLlm`), `classifier.js` (optional local HF models via lazy `@xenova/transformers`)
+- `analyzers/codeModel.js` — regex/heuristic code model behind a stable interface (AST parser is a planned swap)
+- `a11y.js`, `performance.js`, `sanitize.js`, `severity.js`, `watcher.js`, `git/history.js`, `report/index.js`, `mcp/server.js`
+
+All external boundaries are injected (`llm`, `classifier`, `registryClient`, `watcherFactory`, `fetchImpl`, `modelLoader`) — never hard-code providers or network clients inside the engines.
 
 ## Documentation
 
@@ -20,7 +30,7 @@ Greenfield. The repository currently contains specification/architecture documen
 ## Test Specifications (BDD)
 
 - Gherkin scenarios live in `features/` (English, flat files by domain) and `features/pt-BR/` (Portuguese mirror, same file names, `# language: pt` header + `Funcionalidade`/`Cenário`/`Dado`/`Quando`/`Então` keywords).
-- Scenarios are spec-level: the CLI is not yet implemented, so step definitions do not exist. Add `.feature` files — or update existing ones — whenever the spec changes, and keep both languages in sync.
+- Scenarios are spec-level (no step definitions) — the Jest suite in `__tests__/` is the executable counterpart, each test tracing back via `// features/...` comments. Add `.feature` files — or update existing ones — whenever the spec changes, keep both languages in sync, and back them with tests.
 - Tags follow the doc domains: `@layer1`–`@layer3`, `@critical`/`@high`/…, `@mcp`, `@watch`, `@history`, `@a11y`, `@performance`, `@ci`.
 
 ## Conventions
@@ -36,3 +46,5 @@ Greenfield. The repository currently contains specification/architecture documen
 - ESLint 9 flat config (`eslint.config.js`), Prettier (`.prettierrc.json`), Husky hooks in `.husky/`: `pre-commit` → `npm run lint`, `pre-push` → `npm test`.
 - `.npmrc` sets `ignore-scripts=true`, so Husky's `prepare` does not auto-run — run `npx husky` once after `npm install` to enable the hooks. Do not weaken `.npmrc` security settings (`min-release-age`, `allow-git`).
 - `__tests__/fixtures/` is intentionally vulnerable code — excluded from ESLint.
+- `@xenova/transformers` is an optional peer — never import it eagerly; `classifier.js` lazy-imports and degrades cleanly when absent.
+- Remote LLM calls must pass through `sanitizeSnippet` (already enforced in `semantic.js`/`llm.js` when `provider === 'remote'`); tests inject `fetchImpl` — never hit real network in tests.
