@@ -77,3 +77,9 @@ Feature: CLI commands and output modes
     When I run "vibeguard check --classifier-model secret-detector --classifier-task token-classification"
     Then the probabilistic layer includes findings from the local model
     And "--no-classifier" disables it entirely
+
+  @mcp @stdio
+  Scenario: Global CLI doubles as the MCP server
+    When I run "vibeguard mcp"
+    Then the process serves JSON-RPC over stdio
+    And MCP clients can call the vibeguard_* tools and read skill:// resources

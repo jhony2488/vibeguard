@@ -78,3 +78,9 @@ Funcionalidade: Comandos da CLI e modos de saída
     Quando eu executo "vibeguard check --classifier-model secret-detector --classifier-task token-classification"
     Então a camada probabilística inclui achados do modelo local
     E "--no-classifier" desativa-o completamente
+
+  @mcp @stdio
+  Cenário: CLI global funciona também como servidor MCP
+    Quando eu executo "vibeguard mcp"
+    Então o processo serve JSON-RPC sobre stdio
+    E clientes MCP podem chamar as tools vibeguard_* e ler resources skill://

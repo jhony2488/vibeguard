@@ -78,7 +78,11 @@ describe('per-call model selection — agent picks models by project context', (
   let dir, file;
   beforeAll(async () => {
     dir = await makeTmpDir();
-    file = await writeTmpFile(dir, 'api.ts', `const key = "sk-proj-abc123def456";\napp.use(cors({ origin: "*" }));`);
+    file = await writeTmpFile(
+      dir,
+      'api.ts',
+      `const key = "sk-proj-abc123def456";\napp.use(cors({ origin: "*" }));`,
+    );
   });
   afterAll(async () => cleanup(dir));
 
@@ -123,5 +127,44 @@ describe('per-call model selection — agent picks models by project context', (
 
     expect(out.modelsUsed).toBeDefined();
     expect(out.findings.length).toBeGreaterThan(0);
+  });
+});
+
+describe('handleRequest — JSON-RPC method surface', () => {
+  // features/mcp-server.feature — "Server exposes the documented tools"
+  test('tools/list returns descriptors with inputSchema', async () => {
+    const server = makeServer();
+    const { tools } = await server.handleRequest('tools/list');
+    const names = tools.map((t) => t.name);
+    expect(names).toEqual(expect.arrayContaining(server.tools));
+    expect(tools.find((t) => t.name === 'vibeguard_scan_file').inputSchema.required).toContain(
+      'filePath',
+    );
+  });
+
+  test('tools/call wraps handleCall results in MCP content blocks', async () => {
+    const server = makeServer();
+    const res = await server.handleRequest('tools/call', {
+      name: 'vibeguard_audit_diff',
+      arguments: { gitDiff: '+const k = "sk-proj-abc123def456";' },
+    });
+    const payload = JSON.parse(res.content[0].text);
+    expect(payload.findings.length).toBeGreaterThan(0);
+    expect(res.isError).toBeUndefined();
+  });
+
+  test('tools/call on a bad tool returns isError instead of throwing', async () => {
+    const server = makeServer();
+    const res = await server.handleRequest('tools/call', {
+      name: 'vibeguard_nope',
+      arguments: {},
+    });
+    expect(res.isError).toBe(true);
+  });
+
+  test('ping responds and notifications produce no result', async () => {
+    const server = makeServer();
+    expect(await server.handleRequest('ping')).toEqual({});
+    expect(await server.handleRequest('notifications/initialized')).toBeNull();
   });
 });

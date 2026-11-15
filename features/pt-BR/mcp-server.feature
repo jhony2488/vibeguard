@@ -57,7 +57,7 @@ Funcionalidade: Tools do servidor MCP e integração com agentes
   @config
   Cenário: Servidor configurado via mcp.json
     Dada uma configuração de ambiente declarando o servidor MCP "vibeguard"
-    E ele roda com command "npx" e args "-y @vibeguard/mcp-server"
+    E ele roda com command "vibeguard" e args "mcp"
     E env contém "VIBEGUARD_LLM_KEY"
     Quando o cliente inicia a sessão
     Então as tools MCP do VibeGuard ficam disponíveis para o agente

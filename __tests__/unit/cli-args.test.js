@@ -56,7 +56,15 @@ describe('CLI argument parsing', () => {
 
   // features/watch-mode.feature — watch flags
   test('watch parses path, debounce and severity filter', () => {
-    const cfg = parseArgs(['watch', '--path', './src', '--debounce', '1000', '--min-severity', 'high']);
+    const cfg = parseArgs([
+      'watch',
+      '--path',
+      './src',
+      '--debounce',
+      '1000',
+      '--min-severity',
+      'high',
+    ]);
     expect(cfg.command).toBe('watch');
     expect(cfg.path).toBe('./src');
     expect(cfg.debounceMs).toBe(1000);
@@ -79,9 +87,12 @@ describe('CLI argument parsing', () => {
   test('--llm-url/--llm-model/--llm-key configure the semantic provider', () => {
     const cfg = parseArgs([
       'check',
-      '--llm-url', 'http://localhost:11434',
-      '--llm-model', 'codellama',
-      '--llm-key', 'abc',
+      '--llm-url',
+      'http://localhost:11434',
+      '--llm-model',
+      'codellama',
+      '--llm-key',
+      'abc',
     ]);
     expect(cfg.llmUrl).toBe('http://localhost:11434');
     expect(cfg.llmModel).toBe('codellama');
@@ -92,12 +103,19 @@ describe('CLI argument parsing', () => {
   test('--classifier-model/--classifier-task/--no-classifier configure local models', () => {
     const cfg = parseArgs([
       'check',
-      '--classifier-model', 'secret-detector',
-      '--classifier-task', 'token-classification',
+      '--classifier-model',
+      'secret-detector',
+      '--classifier-task',
+      'token-classification',
     ]);
     expect(cfg.classifierModel).toBe('secret-detector');
     expect(cfg.classifierTask).toBe('token-classification');
     expect(parseArgs(['check', '--no-classifier']).noClassifier).toBe(true);
+  });
+
+  // features/mcp-server.feature — "Server is configured through mcp.json"
+  test('mcp selects the stdio MCP server mode', () => {
+    expect(parseArgs(['mcp']).command).toBe('mcp');
   });
 
   test('unknown flags are rejected with a usage error', () => {
