@@ -11,7 +11,7 @@ Implemented — `src/` contains a working zero-dependency CLI (`npm run cli`, bi
 - `layers/` — `deterministic.js` (secrets/CORS/eval/TLS + registry checks), `probabilistic.js` (entropy, anomaly, taint), `semantic.js` (LLM delegation), `llm.js` (OpenAI-compatible `createHttpLlm`, `isLocalUrl`, `resolveLlmConfig`/`loadLlm`, offline `createLocalEchoLlm`), `classifier.js` (optional local HF models via lazy `@xenova/transformers`)
 - `analyzers/codeModel.js` — regex/heuristic code model behind a stable interface (AST parser is a planned swap)
 - `a11y.js`, `performance.js`, `sanitize.js`, `severity.js`, `watcher.js`, `git/history.js`, `report/index.js`
-- `mcp/server.js` — MCP core: tool `handleCall` + JSON-RPC `handleRequest` (initialize, tools/_, resources/_, skills/*) + capabilities
+- `mcp/server.js` — MCP core: tool `handleCall` + JSON-RPC `handleRequest` (`initialize`, `tools/*`, `resources/*`, `skills/*`) + capabilities
 - `mcp/stdio.js` — newline-delimited JSON-RPC 2.0 stdio transport behind `vibeguard mcp` (stdout is protocol-only)
 - `mcp/skills.js` — SEP-2640 Served Skills engine: `skill://` URI resolution (traversal-safe), SKILL.md frontmatter parsing, sha256 resource manifests
 - `skills/` — shipped skill content served by the MCP server: `fix-vibecoding-flaws` (one `rules/<ruleId>.md` playbook per `VG-*` rule) and `secure-review-checklist`

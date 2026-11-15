@@ -17,6 +17,10 @@
 | `vibeguard audit-history`           | Varredura histórica de commits — veja [05 — Watch & Histórico](./05-watch-and-history.md)                              |
 | `vibeguard mcp`                     | Expõe o VibeGuard como servidor MCP via stdio (tools + Skills Servidas) — veja [04 — Servidor MCP](./04-mcp-server.md) |
 
+## Modo Servidor MCP (`vibeguard mcp`)
+
+O mesmo binário global funciona como servidor MCP — `npm i -g vibeguard-cli` e aponte qualquer cliente MCP para `vibeguard mcp`. O processo fala JSON-RPC 2.0 delimitado por linha sobre stdio (stdout é só protocolo) e expõe as tools `vibeguard_*` mais as Skills Servidas da SEP-2640 sob URIs `skill://`. A configuração de modelos do servidor usa as mesmas variáveis de ambiente do CLI (`VIBEGUARD_LLM_*`, `VIBEGUARD_CLASSIFIER_*`) — veja [04 — Servidor MCP](./04-mcp-server.md) para a superfície completa do protocolo e as receitas por cliente.
+
 ## Formatos de Saída
 
 O sistema disponibiliza múltiplos formatos para integração com diferentes fluxos de desenvolvimento:

@@ -23,7 +23,7 @@ The suite exercises this public API surface. It is a **living contract** — if 
 
 ```text
 src/cli.js              → main(argv) → Promise<exitCode>; parseArgs(argv) → config
-src/scanner.js          → scanProject({ directory, deep, focus, ignore, llm, classifier, registryClient }) → Promise<ScanReport>
+src/scanner.js          → scanProject({ directory, deep, depsOnly, focus, ignore, llm, classifier, registryClient }) → Promise<ScanReport>
                           scanFile({ filePath, depth: 'fast' | 'full', llm, classifier }) → Promise<ScanReport>
 src/layers/deterministic.js → analyzeDeterministic(code, ctx) → Finding[]
                               checkDependencies(manifest, { registryClient }) → Finding[]
@@ -44,12 +44,14 @@ src/layers/classifier.js    → createLocalClassifier({model, task, modelLoader,
                               loadClassifier({flags, env, modelLoader}) → classifier | null
 src/severity.js         → classifyFinding(finding) → 'Critical' | 'High' | 'Medium' | 'Low'
                           meetsBlocking(findings, minSeverity) → boolean
+                          severityAtLeast(findings, minSeverity) → Finding[]
 src/sanitize.js         → sanitizeSnippet(code) → { code, masked: string[] }
 src/watcher.js          → shouldIgnore(path, { gitignore, vibeguardignore }) → boolean
                           createDebouncer(fn, ms) → debounced fn
                           createWatcher({ dir, onBatch, debounceMs, watcherFactory }) → { close() }
                           shouldEscalate({ filePath, riskScore, threshold }) → boolean
-src/git/history.js      → auditHistory({ cwd, maxCommits, secretsOnly, checkPerformance }) → HistoryFinding[]
+src/git/history.js      → auditHistory({ cwd, maxCommits, secretsOnly, checkPerformance, registryClient }) → HistoryFinding[]
+src/notify.js           → createNotifier({ execFileImpl, platform }) → { notify({title, message}) }
 src/a11y.js             → checkA11y(code, ctx) → Finding[]
 src/performance.js      → checkPerformance(code, ctx) → Finding[]
 src/report/index.js     → toJson(report) → object; toSarif(report) → object; renderTerminal(report) → string

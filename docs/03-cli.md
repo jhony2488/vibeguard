@@ -17,6 +17,10 @@
 | `vibeguard audit-history`           | Historical commit scan — see [05 — Watch & History](./05-watch-and-history.md)                            |
 | `vibeguard mcp`                     | Serve VibeGuard as a stdio MCP server (tools + Served Skills) — see [04 — MCP Server](./04-mcp-server.md) |
 
+## MCP Server Mode (`vibeguard mcp`)
+
+The same global binary doubles as the MCP server — `npm i -g vibeguard-cli`, then point any MCP client at `vibeguard mcp`. The process speaks newline-delimited JSON-RPC 2.0 over stdio (stdout is protocol-only) and exposes the `vibeguard_*` tools plus the SEP-2640 Served Skills under `skill://` URIs. Server-side model config uses the same env vars as the CLI (`VIBEGUARD_LLM_*`, `VIBEGUARD_CLASSIFIER_*`) — see [04 — MCP Server](./04-mcp-server.md) for the full protocol surface and per-client recipes.
+
 ## Output Formats
 
 VibeGuard provides multiple formats for different development workflows:

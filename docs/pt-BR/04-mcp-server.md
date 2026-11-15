@@ -45,6 +45,32 @@ O VibeGuard opera como um assistente de análise de segurança que pode ser cons
 - **Parâmetros:** `ruleId: string`, `codeSnippet: string`
 - **Função:** chama a camada semântica (LLM) para explicar por que aquele padrão "vibecodado" é um risco de segurança e gera o fix correto.
 
+### `vibeguard_start_watch`
+
+- **Parâmetros:** `directory?: string`, `debounceMs?: number`
+- **Função:** ativa o monitoramento em background com escopo de sessão — o mesmo watcher incremental do `vibeguard watch`, acoplado à sessão de trabalho do agente.
+
+### `vibeguard_audit_git_history`
+
+- **Parâmetros:** `directory?: string`, `maxCommits?: number`, `secretsOnly?: boolean`, `checkPerformance?: boolean`
+- **Função:** varre o histórico de commits atrás de segredos vazados e dependências alucinadas antes de o agente abrir um Pull Request — a contrapartida MCP do `vibeguard audit-history`.
+
+## Transporte e Protocolo
+
+O servidor fala **JSON-RPC 2.0 sobre stdio** — mensagens delimitadas por linha, uma por linha, UTF-8, sem `\n` embutido. `vibeguard mcp` é o ponto de entrada; o stdout carrega apenas tráfego de protocolo, então o processo pode ser ligado diretamente a qualquer cliente MCP.
+
+| Método | Função |
+| --- | --- |
+| `initialize` | Handshake — ecoa o `protocolVersion` e retorna `capabilities` + `serverInfo` |
+| `ping` | Verificação de liveness |
+| `tools/list` | Descritores das tools (`name`, `description`, `inputSchema`) |
+| `tools/call` | Despacha uma tool `vibeguard_*` — resultados vêm embrulhados em blocos `content` de texto, `isError` em falha |
+| `resources/list` | Todo arquivo `skill://` como resource MCP |
+| `resources/read` | Lê um arquivo `skill://` (veja [Skills Servidas](#skills-servidas-sep-2640)) |
+| `resources/directory/read` | Lista os filhos diretos de um diretório `skill://` |
+| `skills/list` / `skills/get` | Enumeração de skills da SEP-2640 (veja abaixo) |
+| `notifications/*` | Ignoradas — nunca produzem resposta |
+
 ### Seleção de modelo por chamada
 
 Toda tool de scan aceita parâmetros opcionais de modelo para que **o agente escolha o modelo certo para o contexto do projeto** — ex.: um token-classifier de segredos em arquivos `.env`, um modelo de embedding para varreduras por similaridade, ou um LLM ajustado para código em repositórios TypeScript:
