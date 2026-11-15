@@ -51,4 +51,5 @@ All external boundaries are injected (`llm`, `classifier`, `registryClient`, `wa
 - `.npmrc` sets `ignore-scripts=true`, so Husky's `prepare` does not auto-run — run `npx husky` once after `npm install` to enable the hooks. Do not weaken `.npmrc` security settings (`min-release-age`, `allow-git`).
 - `__tests__/fixtures/` is intentionally vulnerable code — excluded from ESLint.
 - `@xenova/transformers` is an optional peer — never import it eagerly; `classifier.js` lazy-imports and degrades cleanly when absent.
+- `npm audit` flags `deepmerge` via jest (CVE-2026-93753) — known unfixable, dev-only, rejected by the CNA; do NOT `audit fix --force`. See `CONTRIBUTING.md` → _Known advisories_.
 - Remote LLM calls must pass through `sanitizeSnippet` (already enforced in `semantic.js`/`llm.js` when `provider === 'remote'`); tests inject `fetchImpl` — never hit real network in tests.

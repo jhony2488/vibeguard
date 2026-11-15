@@ -59,17 +59,17 @@ O VibeGuard opera como um assistente de análise de segurança que pode ser cons
 
 O servidor fala **JSON-RPC 2.0 sobre stdio** — mensagens delimitadas por linha, uma por linha, UTF-8, sem `\n` embutido. `vibeguard mcp` é o ponto de entrada; o stdout carrega apenas tráfego de protocolo, então o processo pode ser ligado diretamente a qualquer cliente MCP.
 
-| Método | Função |
-| --- | --- |
-| `initialize` | Handshake — ecoa o `protocolVersion` e retorna `capabilities` + `serverInfo` |
-| `ping` | Verificação de liveness |
-| `tools/list` | Descritores das tools (`name`, `description`, `inputSchema`) |
-| `tools/call` | Despacha uma tool `vibeguard_*` — resultados vêm embrulhados em blocos `content` de texto, `isError` em falha |
-| `resources/list` | Todo arquivo `skill://` como resource MCP |
-| `resources/read` | Lê um arquivo `skill://` (veja [Skills Servidas](#skills-servidas-sep-2640)) |
-| `resources/directory/read` | Lista os filhos diretos de um diretório `skill://` |
-| `skills/list` / `skills/get` | Enumeração de skills da SEP-2640 (veja abaixo) |
-| `notifications/*` | Ignoradas — nunca produzem resposta |
+| Método                       | Função                                                                                                        |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `initialize`                 | Handshake — ecoa o `protocolVersion` e retorna `capabilities` + `serverInfo`                                  |
+| `ping`                       | Verificação de liveness                                                                                       |
+| `tools/list`                 | Descritores das tools (`name`, `description`, `inputSchema`)                                                  |
+| `tools/call`                 | Despacha uma tool `vibeguard_*` — resultados vêm embrulhados em blocos `content` de texto, `isError` em falha |
+| `resources/list`             | Todo arquivo `skill://` como resource MCP                                                                     |
+| `resources/read`             | Lê um arquivo `skill://` (veja [Skills Servidas](#skills-servidas-sep-2640))                                  |
+| `resources/directory/read`   | Lista os filhos diretos de um diretório `skill://`                                                            |
+| `skills/list` / `skills/get` | Enumeração de skills da SEP-2640 (veja abaixo)                                                                |
+| `notifications/*`            | Ignoradas — nunca produzem resposta                                                                           |
 
 ### Seleção de modelo por chamada
 

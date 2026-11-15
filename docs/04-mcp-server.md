@@ -59,17 +59,17 @@ VibeGuard operates as a security-analysis assistant that can be consumed at thre
 
 The server speaks **JSON-RPC 2.0 over stdio** — newline-delimited messages, one per line, UTF-8, no embedded newlines. `vibeguard mcp` is the entry point; stdout carries protocol traffic only, so the process can be wired directly into any MCP client.
 
-| Method | Purpose |
-| --- | --- |
-| `initialize` | Handshake — echoes `protocolVersion` and returns `capabilities` + `serverInfo` |
-| `ping` | Liveness check |
-| `tools/list` | Tool descriptors (`name`, `description`, `inputSchema`) |
-| `tools/call` | Dispatches a `vibeguard_*` tool — results are wrapped in `content` text blocks, `isError` on failure |
-| `resources/list` | Every `skill://` file as an MCP resource |
-| `resources/read` | Reads a `skill://` file (see [Served Skills](#served-skills-sep-2640)) |
-| `resources/directory/read` | Lists a `skill://` directory's direct children |
-| `skills/list` / `skills/get` | SEP-2640 skill enumeration (see below) |
-| `notifications/*` | Ignored — never produces a response |
+| Method                       | Purpose                                                                                              |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `initialize`                 | Handshake — echoes `protocolVersion` and returns `capabilities` + `serverInfo`                       |
+| `ping`                       | Liveness check                                                                                       |
+| `tools/list`                 | Tool descriptors (`name`, `description`, `inputSchema`)                                              |
+| `tools/call`                 | Dispatches a `vibeguard_*` tool — results are wrapped in `content` text blocks, `isError` on failure |
+| `resources/list`             | Every `skill://` file as an MCP resource                                                             |
+| `resources/read`             | Reads a `skill://` file (see [Served Skills](#served-skills-sep-2640))                               |
+| `resources/directory/read`   | Lists a `skill://` directory's direct children                                                       |
+| `skills/list` / `skills/get` | SEP-2640 skill enumeration (see below)                                                               |
+| `notifications/*`            | Ignored — never produces a response                                                                  |
 
 ### Per-call model selection
 

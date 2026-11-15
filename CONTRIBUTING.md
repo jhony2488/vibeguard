@@ -7,7 +7,7 @@ Thanks for helping build VibeGuard — a security, accessibility, and performanc
 ## Ways to Contribute
 
 - **Bug reports & feature requests** — open an issue describing the vibecoding pattern or audit behavior you have in mind.
-- **Documentation** — fixes and improvements to `docs/` (see *Docs are the source of truth* below).
+- **Documentation** — fixes and improvements to `docs/` (see _Docs are the source of truth_ below).
 - **Test scenarios** — new Gherkin scenarios in `features/` describing behavior before it exists.
 - **Code** — bug fixes and features in `src/`, always tied to the spec.
 
@@ -20,17 +20,21 @@ npm install
 npx husky   # required — .npmrc sets ignore-scripts=true, so `prepare` does not auto-run
 ```
 
-| Command | Purpose |
-| --- | --- |
-| `npm test` | Full Jest suite (unit + integration) |
-| `npm run test:unit` | Unit tests only (`__tests__/unit`) |
+| Command                    | Purpose                                          |
+| -------------------------- | ------------------------------------------------ |
+| `npm test`                 | Full Jest suite (unit + integration)             |
+| `npm run test:unit`        | Unit tests only (`__tests__/unit`)               |
 | `npm run test:integration` | Integration tests only (`__tests__/integration`) |
-| `npm run lint` | ESLint over the repo |
-| `npm run lint:fix` | ESLint with autofix |
-| `npm run format` | Prettier write |
-| `npm run format:check` | Prettier check (no writes) |
+| `npm run lint`             | ESLint over the repo                             |
+| `npm run lint:fix`         | ESLint with autofix                              |
+| `npm run format`           | Prettier write                                   |
+| `npm run format:check`     | Prettier check (no writes)                       |
 
 > `.npmrc` ships security settings (`min-release-age=7`, `ignore-scripts=true`, `allow-git=none`). Do not weaken or bypass them — if a new dependency fails the release-age gate, pin an older version instead.
+
+### Known advisories
+
+- **deepmerge (CVE-2026-93753 / GHSA-gcqx-w48m-w2h4)** — `npm audit` flags the transitive dev-dep `jest → jest-config → deepmerge@4.3.1`. **Do not fix**: there is no patched release (even `jest@30` still pulls it), the only `audit fix --force` path downgrades to jest 25, and the CVE was rejected by the CNA (2026-11-02) as not describing a real vulnerability. It's also dev-only — nothing reaches the published package. Revisit when a patched deepmerge ships or the advisory is withdrawn.
 
 ## Docs Are the Source of Truth
 
@@ -54,19 +58,19 @@ Keep both trees in sync in the same PR. Every doc starts with a language-switche
 
 Commits use Conventional-Commits-style prefixes:
 
-| Prefix | Use for |
-| --- | --- |
-| `feat:` | New user-facing behavior |
-| `fix:` / `bugfix:` | Bug fixes |
-| `test:` / `tests:` | Adding or changing tests only |
-| `docs:` | Documentation and `.feature` spec changes |
-| `refactor:` | Behavior-neutral restructuring |
-| `perf:` | Performance improvements |
-| `style:` | Formatting/whitespace only |
-| `chore:` | Tooling, deps, build plumbing |
-| `ci:` | CI configuration |
-| `build:` | Build system or packaging |
-| `revert:` | Reverting a previous commit |
+| Prefix             | Use for                                   |
+| ------------------ | ----------------------------------------- |
+| `feat:`            | New user-facing behavior                  |
+| `fix:` / `bugfix:` | Bug fixes                                 |
+| `test:` / `tests:` | Adding or changing tests only             |
+| `docs:`            | Documentation and `.feature` spec changes |
+| `refactor:`        | Behavior-neutral restructuring            |
+| `perf:`            | Performance improvements                  |
+| `style:`           | Formatting/whitespace only                |
+| `chore:`           | Tooling, deps, build plumbing             |
+| `ci:`              | CI configuration                          |
+| `build:`           | Build system or packaging                 |
+| `revert:`          | Reverting a previous commit               |
 
 An optional scope is allowed — `feat(mcp): serve skills via SEP-2640`. Write the subject in the imperative, ≤72 chars, e.g. `fix: ignore .env symlinks in scanProject`.
 
@@ -80,17 +84,17 @@ git config --global user.signingkey ~/.ssh/id_ed25519.pub   # your public key
 git config --global commit.gpgsign true
 ```
 
-Then upload the same public key to GitHub → *Settings → SSH and GPG keys → New SSH key → Key type: Signing Key*, so commits show as **Verified**.
+Then upload the same public key to GitHub → _Settings → SSH and GPG keys → New SSH key → Key type: Signing Key_, so commits show as **Verified**.
 
 PRs containing unsigned commits will be asked to re-sign (`git rebase --signoff`/`git commit --amend -S`) before review.
 
 ## Code Style & Tooling
 
-| Tool | Config | Enforcement |
-| --- | --- | --- |
-| ESLint 9 | `eslint.config.js` (flat config, ESM + Node + Jest globals) | `pre-commit` hook → `npm run lint` |
-| Prettier | `.prettierrc.json` | `npm run format` / `format:check` |
-| Husky | `.husky/` | `pre-commit` → lint · `pre-push` → `npm test` |
+| Tool     | Config                                                      | Enforcement                                   |
+| -------- | ----------------------------------------------------------- | --------------------------------------------- |
+| ESLint 9 | `eslint.config.js` (flat config, ESM + Node + Jest globals) | `pre-commit` hook → `npm run lint`            |
+| Prettier | `.prettierrc.json`                                          | `npm run format` / `format:check`             |
+| Husky    | `.husky/`                                                   | `pre-commit` → lint · `pre-push` → `npm test` |
 
 Run `npm run lint` and `npm run format` before pushing. Follow the existing code style — see `AGENTS.md` and neighboring files when in doubt.
 

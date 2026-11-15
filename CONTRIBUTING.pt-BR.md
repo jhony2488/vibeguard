@@ -7,7 +7,7 @@ Obrigado por ajudar a construir o VibeGuard — um auditor de segurança, acessi
 ## Formas de Contribuir
 
 - **Bug reports e pedidos de features** — abra uma issue descrevendo o padrão de vibecoding ou o comportamento de auditoria que você tem em mente.
-- **Documentação** — correções e melhorias em `docs/` (veja *Docs são a fonte da verdade* abaixo).
+- **Documentação** — correções e melhorias em `docs/` (veja _Docs são a fonte da verdade_ abaixo).
 - **Cenários de teste** — novos cenários Gherkin em `features/` descrevendo comportamento antes de ele existir.
 - **Código** — bug fixes e features em `src/`, sempre vinculados à spec.
 
@@ -20,17 +20,21 @@ npm install
 npx husky   # obrigatório — o .npmrc define ignore-scripts=true, então o `prepare` não roda sozinho
 ```
 
-| Comando | Função |
-| --- | --- |
-| `npm test` | Suite completa do Jest (unit + integration) |
-| `npm run test:unit` | Apenas testes unitários (`__tests__/unit`) |
+| Comando                    | Função                                                |
+| -------------------------- | ----------------------------------------------------- |
+| `npm test`                 | Suite completa do Jest (unit + integration)           |
+| `npm run test:unit`        | Apenas testes unitários (`__tests__/unit`)            |
 | `npm run test:integration` | Apenas testes de integração (`__tests__/integration`) |
-| `npm run lint` | ESLint no repositório |
-| `npm run lint:fix` | ESLint com autofix |
-| `npm run format` | Prettier write |
-| `npm run format:check` | Verificação do Prettier (sem escrita) |
+| `npm run lint`             | ESLint no repositório                                 |
+| `npm run lint:fix`         | ESLint com autofix                                    |
+| `npm run format`           | Prettier write                                        |
+| `npm run format:check`     | Verificação do Prettier (sem escrita)                 |
 
 > O `.npmrc` traz configurações de segurança (`min-release-age=7`, `ignore-scripts=true`, `allow-git=none`). Não enfraqueça nem contorne — se uma dependência nova falhar no gate de idade de release, fixe uma versão mais antiga.
+
+### Advisories conhecidas
+
+- **deepmerge (CVE-2026-93753 / GHSA-gcqx-w48m-w2h4)** — o `npm audit` sinaliza a dev-dep transitiva `jest → jest-config → deepmerge@4.3.1`. **Não corrija**: não existe release com patch (até o `jest@30` ainda a puxa), o único caminho do `audit fix --force` rebaixa para o jest 25, e a CVE foi rejeitada pelo CNA (02/11/2026) por não descrever uma vulnerabilidade real. Também é dev-only — nada disso chega ao pacote publicado. Reavalie quando sair um deepmerge corrigido ou a advisory for retirada.
 
 ## Docs são a Fonte da Verdade
 
@@ -54,19 +58,19 @@ Mantenha as duas árvores sincronizadas no mesmo PR. Todo doc começa com uma li
 
 Commits usam prefixos no estilo Conventional Commits:
 
-| Prefixo | Uso |
-| --- | --- |
-| `feat:` | Novo comportamento visível ao usuário |
-| `fix:` / `bugfix:` | Correção de bugs |
-| `test:` / `tests:` | Adição ou alteração apenas de testes |
-| `docs:` | Documentação e mudanças de spec em `.feature` |
-| `refactor:` | Reestruturação sem mudança de comportamento |
-| `perf:` | Melhorias de performance |
-| `style:` | Apenas formatação/espaços |
-| `chore:` | Tooling, dependências, build |
-| `ci:` | Configuração de CI |
-| `build:` | Sistema de build ou empacotamento |
-| `revert:` | Reversão de commit anterior |
+| Prefixo            | Uso                                           |
+| ------------------ | --------------------------------------------- |
+| `feat:`            | Novo comportamento visível ao usuário         |
+| `fix:` / `bugfix:` | Correção de bugs                              |
+| `test:` / `tests:` | Adição ou alteração apenas de testes          |
+| `docs:`            | Documentação e mudanças de spec em `.feature` |
+| `refactor:`        | Reestruturação sem mudança de comportamento   |
+| `perf:`            | Melhorias de performance                      |
+| `style:`           | Apenas formatação/espaços                     |
+| `chore:`           | Tooling, dependências, build                  |
+| `ci:`              | Configuração de CI                            |
+| `build:`           | Sistema de build ou empacotamento             |
+| `revert:`          | Reversão de commit anterior                   |
 
 Escopo opcional é permitido — `feat(mcp): serve skills via SEP-2640`. Escreva o assunto no imperativo, ≤72 caracteres, ex.: `fix: ignore .env symlinks in scanProject`.
 
@@ -80,17 +84,17 @@ git config --global user.signingkey ~/.ssh/id_ed25519.pub   # sua chave pública
 git config --global commit.gpgsign true
 ```
 
-Depois suba a mesma chave pública no GitHub → *Settings → SSH and GPG keys → New SSH key → Key type: Signing Key*, para que os commits apareçam como **Verified**.
+Depois suba a mesma chave pública no GitHub → _Settings → SSH and GPG keys → New SSH key → Key type: Signing Key_, para que os commits apareçam como **Verified**.
 
 PRs com commits não assinados serão devolvidos para re-assinatura (`git rebase --signoff`/`git commit --amend -S`) antes da revisão.
 
 ## Estilo de Código & Tooling
 
-| Ferramenta | Config | Enforcement |
-| --- | --- | --- |
-| ESLint 9 | `eslint.config.js` (flat config, ESM + Node + Jest globals) | hook `pre-commit` → `npm run lint` |
-| Prettier | `.prettierrc.json` | `npm run format` / `format:check` |
-| Husky | `.husky/` | `pre-commit` → lint · `pre-push` → `npm test` |
+| Ferramenta | Config                                                      | Enforcement                                   |
+| ---------- | ----------------------------------------------------------- | --------------------------------------------- |
+| ESLint 9   | `eslint.config.js` (flat config, ESM + Node + Jest globals) | hook `pre-commit` → `npm run lint`            |
+| Prettier   | `.prettierrc.json`                                          | `npm run format` / `format:check`             |
+| Husky      | `.husky/`                                                   | `pre-commit` → lint · `pre-push` → `npm test` |
 
 Rode `npm run lint` e `npm run format` antes de fazer push. Siga o estilo de código existente — veja `AGENTS.md` e os arquivos vizinhos em caso de dúvida.
 
