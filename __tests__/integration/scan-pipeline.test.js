@@ -32,9 +32,7 @@ describe('scanProject — layered pipeline over the fixture project', () => {
   test('includes probabilistic findings (entropy / unsafe flows)', async () => {
     const report = await scanProject({ directory: dir, ...deps() });
 
-    expect(
-      report.findings.some((f) => /entropy|flow|taint/i.test(f.category)),
-    ).toBe(true);
+    expect(report.findings.some((f) => /entropy|flow|taint/i.test(f.category))).toBe(true);
   });
 
   // features/severity.feature — every finding carries a classified severity
@@ -45,13 +43,30 @@ describe('scanProject — layered pipeline over the fixture project', () => {
       expect(['Critical', 'High', 'Medium', 'Low']).toContain(f.severity);
     }
   });
+
+  // features/cli-commands.feature — "Dependency-focused scan"
+  test('depsOnly scans only the dependency tree', async () => {
+    const report = await scanProject({
+      directory: dir,
+      depsOnly: true,
+      registryClient: createMockRegistry(['express', 'lodash']),
+    });
+
+    expect(report.findings.length).toBeGreaterThan(0);
+    expect(report.findings.every((f) => f.file === 'package.json')).toBe(true);
+    expect(report.findings.some((f) => f.category === 'Hallucinated package')).toBe(true);
+  });
 });
 
 describe('layer orchestration', () => {
   // features/semantic-audit.feature — "Semantic layer runs only on flagged or deep-scan files"
   test('default mode invokes the LLM only for flagged files', async () => {
     const llm = createMockLlm();
-    await scanProject({ directory: dir, llm, registryClient: createMockRegistry(['express', 'lodash']) });
+    await scanProject({
+      directory: dir,
+      llm,
+      registryClient: createMockRegistry(['express', 'lodash']),
+    });
 
     const audited = llm.audit.mock.calls.map(([arg]) => arg.filePath);
     expect(audited).toContain('src/auth.ts');

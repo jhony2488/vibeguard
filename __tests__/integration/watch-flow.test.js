@@ -1,9 +1,22 @@
 // features/watch-mode.feature — watcher + debounce + escalation + notifications (injected fakes)
-import { describe, test, expect, jest, beforeEach, afterEach } from '@jest/globals';
+import {
+  describe,
+  test,
+  expect,
+  jest,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  afterAll,
+} from '@jest/globals';
 import { EventEmitter } from 'node:events';
+import path from 'node:path';
 import { createWatcher } from '../../src/watcher.js';
 import { scanFile } from '../../src/scanner.js';
+import { main } from '../../src/cli.js';
 import { createMockLlm } from '../helpers/mockLlm.js';
+import { createMockRegistry } from '../helpers/mockRegistry.js';
+import { makeTmpDir, writeTmpFile, cleanup } from '../helpers/tmpProject.js';
 
 // watcherFactory injects a controllable fake fs watcher.
 const makeFakeWatcherFactory = () => {
@@ -24,7 +37,12 @@ describe('watch mode — event-driven audit flow', () => {
   test('a file change queues an incremental audit', async () => {
     const { factory, emit } = makeFakeWatcherFactory();
     const onBatch = jest.fn();
-    const watcher = createWatcher({ dir: '/proj', onBatch, debounceMs: 1000, watcherFactory: factory });
+    const watcher = createWatcher({
+      dir: '/proj',
+      onBatch,
+      debounceMs: 1000,
+      watcherFactory: factory,
+    });
 
     emit('src/auth.ts');
     jest.advanceTimersByTime(1000);
@@ -37,7 +55,12 @@ describe('watch mode — event-driven audit flow', () => {
   test('ignored paths never reach the audit queue', async () => {
     const { factory, emit } = makeFakeWatcherFactory();
     const onBatch = jest.fn();
-    const watcher = createWatcher({ dir: '/proj', onBatch, debounceMs: 1000, watcherFactory: factory });
+    const watcher = createWatcher({
+      dir: '/proj',
+      onBatch,
+      debounceMs: 1000,
+      watcherFactory: factory,
+    });
 
     emit('node_modules/pkg/index.js');
     emit('.git/objects/ab');
@@ -91,5 +114,64 @@ describe('watch mode — event-driven audit flow', () => {
     expect(notifier.notify).toHaveBeenCalledWith(
       expect.objectContaining({ severity: 'Critical', file: 'src/auth.ts' }),
     );
+  });
+});
+
+describe('watch mode — CLI wiring via main()', () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let dir, stdoutSpy;
+  beforeAll(async () => {
+    dir = await makeTmpDir();
+    // each file in its own dir — onBatch scans path.dirname(changedFile)
+    await writeTmpFile(dir, 'leak/leak.ts', `const key = "sk-proj-abc123def456";\n`);
+    await writeTmpFile(dir, 'low/only-low.jsx', `export const A = () => <img src="x.png" />;\n`);
+  });
+  afterAll(async () => cleanup(dir));
+  beforeEach(() => {
+    stdoutSpy = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+  });
+  afterEach(() => stdoutSpy.mockRestore());
+
+  const runWatch = (args, notifier) => {
+    const { factory, emit } = makeFakeWatcherFactory();
+    return {
+      emit,
+      ready: main(['watch', dir, '--debounce', '50', ...args], {
+        watcherFactory: factory,
+        notifier,
+        llm: createMockLlm(),
+        classifier: null,
+        registryClient: createMockRegistry(['express', 'lodash']),
+      }),
+    };
+  };
+
+  // features/watch-mode.feature — "Severe finding fires a native OS notification"
+  test('--notify fires the injected notifier on a High+ finding', async () => {
+    const notifier = { notify: jest.fn() };
+    const { emit, ready } = runWatch(['--notify'], notifier);
+    const { watcher } = await ready;
+
+    emit(path.join(dir, 'leak', 'leak.ts'));
+    await sleep(250);
+
+    expect(notifier.notify).toHaveBeenCalledWith(expect.objectContaining({ title: 'VibeGuard' }));
+    await watcher.close();
+  });
+
+  // features/watch-mode.feature — "Watch with custom path, debounce, and severity filter"
+  test('--min-severity high filters out Low findings before surfacing', async () => {
+    const notifier = { notify: jest.fn() };
+    const { emit, ready } = runWatch(['--notify', '--min-severity', 'high'], notifier);
+    const { watcher } = await ready;
+
+    emit(path.join(dir, 'low', 'only-low.jsx')); // only a Low a11y finding — must not notify
+    await sleep(500);
+    expect(notifier.notify).not.toHaveBeenCalled();
+
+    emit(path.join(dir, 'leak', 'leak.ts')); // Critical secret — must notify
+    await sleep(500);
+    expect(notifier.notify).toHaveBeenCalled();
+    await watcher.close();
   });
 });

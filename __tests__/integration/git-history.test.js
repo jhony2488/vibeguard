@@ -18,10 +18,14 @@ beforeAll(async () => {
 
   // Commit 1: introduces a leaked secret + a hallucinated dependency
   await writeTmpFile(dir, '.env', 'OPENAI_API_KEY=sk-proj-hist123leak456\n');
-  await writeTmpFile(dir, 'package.json', JSON.stringify({
-    name: 'hist-fixture',
-    dependencies: { 'react-quantum-hooks': '^1.0.0', lodash: '*' },
-  }));
+  await writeTmpFile(
+    dir,
+    'package.json',
+    JSON.stringify({
+      name: 'hist-fixture',
+      dependencies: { 'react-quantum-hooks': '^1.0.0', lodash: '*' },
+    }),
+  );
   git(dir, ['add', '.']);
   git(dir, ['commit', '-qm', 'add env and deps']);
 
@@ -29,6 +33,15 @@ beforeAll(async () => {
   await writeTmpFile(dir, '.env', '');
   git(dir, ['add', '.']);
   git(dir, ['commit', '-qm', 'remove env values']);
+
+  // Commit 3: introduces performance debt (namespace import)
+  await writeTmpFile(
+    dir,
+    'src/heavy.js',
+    "import * as _ from 'lodash';\nexport const pick = _.pick;\n",
+  );
+  git(dir, ['add', '.']);
+  git(dir, ['commit', '-qm', 'add heavy import']);
 });
 afterAll(async () => cleanup(dir));
 
@@ -37,7 +50,9 @@ describe('auditHistory — historical leak detection', () => {
   test('finds a secret that was committed and later removed', async () => {
     const findings = await auditHistory({ cwd: dir });
 
-    const f = findings.find((x) => /sk-proj-hist123leak456|secret|env/i.test(x.message + (x.match ?? '')));
+    const f = findings.find((x) =>
+      /sk-proj-hist123leak456|secret|env/i.test(x.message + (x.match ?? '')),
+    );
     expect(f).toBeDefined();
     expect(f.commit).toMatch(/^[0-9a-f]{7,40}$/);
     expect(f.line).toBeGreaterThan(0);
@@ -73,6 +88,25 @@ describe('auditHistory — historical leak detection', () => {
   test('secretsOnly filters out non-secret findings', async () => {
     const findings = await auditHistory({ cwd: dir, secretsOnly: true });
 
-    expect(findings.every((f) => /secret|env|key|credential/i.test(f.category + f.message))).toBe(true);
+    expect(findings.every((f) => /secret|env|key|credential/i.test(f.category + f.message))).toBe(
+      true,
+    );
+  });
+
+  // features/git-history-audit.feature — "Historical scan for performance and accessibility debt"
+  test('checkPerformance reports perf debt introduced by a commit', async () => {
+    const findings = await auditHistory({ cwd: dir, checkPerformance: true });
+
+    const perf = findings.find((f) => f.ruleId === 'VG-PERF-002');
+    expect(perf).toBeDefined();
+    expect(perf.domain).toBe('PERFORMANCE');
+    expect(perf.commit).toMatch(/^[0-9a-f]{7,40}$/);
+    expect(perf.file).toBe('src/heavy.js');
+  });
+
+  test('without checkPerformance no perf findings are produced', async () => {
+    const findings = await auditHistory({ cwd: dir });
+
+    expect(findings.some((f) => f.domain === 'PERFORMANCE')).toBe(false);
   });
 });

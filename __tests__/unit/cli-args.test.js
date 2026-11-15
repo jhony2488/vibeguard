@@ -83,6 +83,11 @@ describe('CLI argument parsing', () => {
     expect(cfg.detectSecrets).toBe(true);
   });
 
+  // features/git-history-audit.feature — "Historical scan for performance and accessibility debt"
+  test('audit-history parses --check-performance', () => {
+    expect(parseArgs(['audit-history', '--check-performance']).checkPerformance).toBe(true);
+  });
+
   // features/cli-commands.feature — LLM provider flags
   test('--llm-url/--llm-model/--llm-key configure the semantic provider', () => {
     const cfg = parseArgs([
