@@ -36,6 +36,8 @@ Para proporcionar rápida execução sem comprometer a profundidade da análise,
 
 A primeira camada é focada na execução de regras estritas, imutáveis e de ultra-baixa latência. Seu objetivo é filtrar problemas óbvios e violadores diretos de conformidade antes de consumir recursos computacionalmente mais densos.
 
+> **Nota de implementação (v0):** o modelo de código consumido por esta camada é construído por `src/analyzers/codeModel.js` — um analisador por regex/heurísticas atrás de uma interface estável. A troca por um parser AST real (ex.: `@babel/parser`) é uma melhoria planejada que não altera os contratos das camadas.
+
 - **Análise da Árvore de Sintaxe Abstrata (AST)** — a ferramenta decompõe o código-fonte em nós sintáticos para identificar chamadas de funções perigosas (como execução dinâmica de código), configurações permissivas de CORS ou desativação explícita de SSL/TLS.
 - **Verificação de pacotes no registro** — analisa arquivos de manifesto de dependências e compara as bibliotecas solicitadas com os registros públicos de pacotes, identificando nomes suspeitos de terem sido inventados pelos modelos de linguagem.
 - **Expressões regulares rigorosas** — busca por assinaturas conhecidas de chaves privadas, tokens de serviços de nuvem e formatos estruturados de credenciais.
