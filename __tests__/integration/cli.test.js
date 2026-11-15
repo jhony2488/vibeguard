@@ -1,5 +1,7 @@
 // features/cli-commands.feature + features/severity.feature — end-to-end CLI subprocess runs
-import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
+import { describe, test, expect, beforeAll, afterAll, jest } from '@jest/globals';
+
+jest.setTimeout(30000); // subprocess spawns + cold registry timeouts
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { access } from 'node:fs/promises';

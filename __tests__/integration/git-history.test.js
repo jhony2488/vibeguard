@@ -1,7 +1,8 @@
 // features/git-history-audit.feature — historical secrets, hallucinated deps, mitigation report
-import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
+import { describe, test, expect, beforeAll, afterAll, jest } from '@jest/globals';
+
+jest.setTimeout(30000); // real git init/commits can be slow on CI/Windows
 import { execFileSync } from 'node:child_process';
-import path from 'node:path';
 import { auditHistory } from '../../src/git/history.js';
 import { makeTmpDir, writeTmpFile, cleanup } from '../helpers/tmpProject.js';
 
@@ -13,6 +14,7 @@ beforeAll(async () => {
   git(dir, ['init', '-q']);
   git(dir, ['config', 'user.email', 'test@vibeguard.dev']);
   git(dir, ['config', 'user.name', 'VibeGuard Test']);
+  git(dir, ['config', 'commit.gpgsign', 'false']); // temp-repo only: host env enforces SSH signing
 
   // Commit 1: introduces a leaked secret + a hallucinated dependency
   await writeTmpFile(dir, '.env', 'OPENAI_API_KEY=sk-proj-hist123leak456\n');

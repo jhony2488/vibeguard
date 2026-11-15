@@ -28,5 +28,5 @@ export async function writeTmpFile(dir, relPath, contents) {
 }
 
 export async function cleanup(dir) {
-  await rm(dir, { recursive: true, force: true });
+  await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 });
 }

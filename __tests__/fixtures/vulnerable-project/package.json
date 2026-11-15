@@ -1,0 +1,10 @@
+{
+  "name": "vulnerable-project",
+  "version": "1.0.0",
+  "description": "Intentionally vibecoded fixture used by the VibeGuard test suite",
+  "dependencies": {
+    "express": "^4.19.0",
+    "express-rate-limitter-ultra": "^1.0.0",
+    "lodash": "*"
+  }
+}

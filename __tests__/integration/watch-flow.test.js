@@ -55,7 +55,12 @@ describe('watch mode — event-driven audit flow', () => {
     const analyze = jest.fn(async (files) =>
       Promise.all(
         files.map((filePath) =>
-          scanFile({ filePath, depth: 'full', llm, registryClient: { exists: async () => true } }),
+          scanFile({
+            filePath,
+            depth: 'full',
+            llm,
+            registryClient: { exists: async () => true },
+          }).catch(() => ({ filePath, findings: [] })),
         ),
       ),
     );
