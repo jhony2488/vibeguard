@@ -15,7 +15,20 @@ import { checkPerformance } from './performance.js';
 import { shouldIgnore } from './watcher.js';
 import { sanitizeSnippet } from './sanitize.js';
 
-const SCAN_EXTENSIONS = new Set(['.js', '.ts', '.tsx', '.jsx', '.mjs', '.cjs', '.json', '.env', '.yaml', '.yml', '.html', '.css']);
+const SCAN_EXTENSIONS = new Set([
+  '.js',
+  '.ts',
+  '.tsx',
+  '.jsx',
+  '.mjs',
+  '.cjs',
+  '.json',
+  '.env',
+  '.yaml',
+  '.yml',
+  '.html',
+  '.css',
+]);
 
 const FOCUS_DOMAINS = { security: 'SECURITY', perf: 'PERFORMANCE', a11y: 'A11y' };
 
@@ -56,7 +69,14 @@ function detectFramework(manifest) {
   return deps.next ? 'next' : undefined;
 }
 
-export async function scanFile({ filePath, depth = 'fast', llm, classifier, focus, language } = {}) {
+export async function scanFile({
+  filePath,
+  depth = 'fast',
+  llm,
+  classifier,
+  focus,
+  language,
+} = {}) {
   const code = await readFile(filePath, 'utf8');
   const domains = normalizeFocus(focus);
   const ctx = { filePath, language: language ?? path.extname(filePath).slice(1), domains };
@@ -83,6 +103,7 @@ export async function scanFile({ filePath, depth = 'fast', llm, classifier, focu
 export async function scanProject({
   directory = '.',
   deep = false,
+  depsOnly = false,
   llm = createLocalEchoLlm(),
   classifier,
   registryClient,
@@ -91,6 +112,22 @@ export async function scanProject({
   maxFiles = 5000,
 } = {}) {
   const domains = normalizeFocus(focus);
+
+  // --deps mode: only the dependency tree is audited (package.json vs registry).
+  if (depsOnly) {
+    const findings = [];
+    let manifest = null;
+    try {
+      manifest = JSON.parse(await readFile(path.join(directory, 'package.json'), 'utf8'));
+    } catch {
+      manifest = null;
+    }
+    if (manifest && registryClient) {
+      findings.push(...(await checkDependencies(manifest, { registryClient })));
+    }
+    return { directory, filesScanned: 0, auditedFiles: [], findings };
+  }
+
   const lists = { gitignore: [], vibeguardignore: [], ...(ignore ?? {}) };
   const findings = [];
   const audited = [];
@@ -113,13 +150,20 @@ export async function scanProject({
     if (++filesScanned > maxFiles) break;
 
     const code = await readFile(filePath, 'utf8');
-    const ctx = { filePath: rel, language: ext.slice(1) || 'dotenv', domains, framework: detectFramework(manifest) };
+    const ctx = {
+      filePath: rel,
+      language: ext.slice(1) || 'dotenv',
+      domains,
+      framework: detectFramework(manifest),
+    };
 
     let fileFindings = analyzeFile(code, ctx);
 
     if (classifier && domains.includes('SECURITY')) {
       const model = buildCodeModel(code, ctx);
-      fileFindings.push(...(await classifyStrings({ strings: model.strings, classifier, filePath: rel })));
+      fileFindings.push(
+        ...(await classifyStrings({ strings: model.strings, classifier, filePath: rel })),
+      );
     }
 
     const shouldAudit = deep ? true : fileFindings.length > 0;

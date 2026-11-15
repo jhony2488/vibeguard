@@ -1,7 +1,10 @@
 // MCP server — exposes VibeGuard analysis as Model Context Protocol tools
-// (docs/04-mcp-server.md). Transport-agnostic core: `tools` lists the exposed
-// names and `handleCall` dispatches JSON-RPC-style calls to the engines.
+// and Served Skills (SEP-2640) as skill:// resources (docs/04-mcp-server.md).
+// `handleCall` dispatches tool calls; `handleRequest` dispatches JSON-RPC
+// methods — the stdio transport lives in ./stdio.js.
 
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { scanFile, scanProject } from '../scanner.js';
 import { explainIssue } from '../layers/semantic.js';
 import { auditHistory } from '../git/history.js';
@@ -9,6 +12,11 @@ import { analyzeDeterministic } from '../layers/deterministic.js';
 import { createWatcher } from '../watcher.js';
 import { createLocalEchoLlm, createHttpLlm } from '../layers/llm.js';
 import { createLocalClassifier } from '../layers/classifier.js';
+import { loadSkills, resolveSkillUri, readSkillResource, readSkillDirectory } from './skills.js';
+import { RPC_ERRORS, rpcError } from './stdio.js';
+
+const pkg = createRequire(import.meta.url)('../../package.json');
+const DEFAULT_SKILLS_DIR = fileURLToPath(new URL('../../skills/', import.meta.url));
 
 export const MCP_TOOLS = [
   'vibeguard_scan_file',
@@ -18,6 +26,102 @@ export const MCP_TOOLS = [
   'vibeguard_start_watch',
   'vibeguard_audit_git_history',
 ];
+
+const MODEL_PARAMS = {
+  model: { type: 'string', description: 'Semantic-layer model for this call' },
+  llmUrl: { type: 'string', description: 'OpenAI-compatible endpoint URL' },
+  llmKey: { type: 'string', description: 'API key for the endpoint' },
+  classifierModel: { type: 'string', description: 'Local HF classifier model id' },
+  classifierTask: {
+    type: 'string',
+    description: 'text-classification | token-classification | feature-extraction',
+  },
+};
+
+export const TOOL_DESCRIPTORS = [
+  {
+    name: 'vibeguard_scan_file',
+    description: 'Deterministic + probabilistic scan of a single file in real time.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filePath: { type: 'string' },
+        depth: { type: 'string', enum: ['fast', 'full'] },
+        ...MODEL_PARAMS,
+      },
+      required: ['filePath'],
+    },
+  },
+  {
+    name: 'vibeguard_scan_project',
+    description: 'Scan the whole project before a commit or deploy.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        directory: { type: 'string' },
+        ignorePatterns: { type: 'array', items: { type: 'string' } },
+        ...MODEL_PARAMS,
+      },
+    },
+  },
+  {
+    name: 'vibeguard_audit_diff',
+    description:
+      'Audit only the added (+) lines of a git diff — agent self-audit before writing to disk.',
+    inputSchema: {
+      type: 'object',
+      properties: { gitDiff: { type: 'string' }, ...MODEL_PARAMS },
+      required: ['gitDiff'],
+    },
+  },
+  {
+    name: 'vibeguard_explain_issue',
+    description: 'Semantic-layer explanation of a flagged pattern plus a corrected patch.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ruleId: { type: 'string' },
+        codeSnippet: { type: 'string' },
+        ...MODEL_PARAMS,
+      },
+      required: ['ruleId', 'codeSnippet'],
+    },
+  },
+  {
+    name: 'vibeguard_start_watch',
+    description: 'Start a session-scoped watcher that re-audits changed files.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        directory: { type: 'string' },
+        debounceMs: { type: 'number' },
+      },
+    },
+  },
+  {
+    name: 'vibeguard_audit_git_history',
+    description: 'Scan commit history for leaked secrets and hallucinated dependencies.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        directory: { type: 'string' },
+        maxCommits: { type: 'number' },
+        secretsOnly: { type: 'boolean' },
+        checkPerformance: { type: 'boolean' },
+      },
+    },
+  },
+];
+
+const CAPABILITIES = {
+  tools: {},
+  resources: {},
+  extensions: {
+    'io.modelcontextprotocol/skills': { directoryRead: true },
+  },
+};
+
+const SERVER_INFO = { name: 'vibeguard', version: pkg.version };
 
 // Scans only the added (+) lines of a git diff.
 function addedLines(gitDiff = '') {
@@ -42,7 +146,19 @@ function addedLines(gitDiff = '') {
 export function createMcpServer(deps = {}) {
   const defaultLlm = deps.llm ?? createLocalEchoLlm();
   const registryClient = deps.registryClient;
+  const skillsDir = deps.skillsDir ?? DEFAULT_SKILLS_DIR;
+  const io = { readFile: deps.readFile, readdir: deps.readdir };
   const watchers = new Map();
+  let skillsCache;
+
+  const skills = async () => (skillsCache ??= await loadSkills(skillsDir, io));
+
+  // Skill entry as served on the wire — without internal fields.
+  const publicSkill = (skill) => {
+    const { dir, ...entry } = skill;
+    void dir;
+    return entry;
+  };
 
   // Per-call model resolution — the agent picks models by project context.
   // factories let tools instantiate models on demand without forcing config.
@@ -129,6 +245,7 @@ export function createMcpServer(deps = {}) {
             cwd: params.directory ?? params.cwd ?? '.',
             maxCommits: params.maxCommits ?? params.commits,
             secretsOnly: params.secretsOnly ?? params.detectSecrets,
+            checkPerformance: params.checkPerformance,
             registryClient,
           }),
         };
@@ -138,5 +255,96 @@ export function createMcpServer(deps = {}) {
     }
   }
 
-  return { tools: [...MCP_TOOLS], handleCall };
+  // JSON-RPC method dispatcher — tools, resources, and SEP-2640 skills.
+  async function handleRequest(method, params = {}) {
+    if (method.startsWith('notifications/')) return null;
+
+    switch (method) {
+      case 'initialize':
+        return {
+          protocolVersion: params.protocolVersion ?? '2024-11-05',
+          capabilities: CAPABILITIES,
+          serverInfo: SERVER_INFO,
+        };
+
+      case 'ping':
+        return {};
+
+      case 'tools/list':
+        return { tools: TOOL_DESCRIPTORS };
+
+      case 'tools/call': {
+        if (!params || typeof params.name !== 'string') {
+          throw rpcError(RPC_ERRORS.INVALID_PARAMS, 'tools/call requires params.name');
+        }
+        try {
+          const result = await handleCall(params.name, params.arguments ?? {});
+          return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+        } catch (err) {
+          return { content: [{ type: 'text', text: err.message }], isError: true };
+        }
+      }
+
+      case 'skills/list':
+        return { skills: (await skills()).map(publicSkill) };
+
+      case 'skills/get': {
+        const list = await skills();
+        const want = params.uri;
+        const skill = list.find(
+          (s) =>
+            s.uri === want ||
+            `${s.name}` === want ||
+            `skill://${s.name}` === want ||
+            `skill://${s.name}/SKILL.md` === want,
+        );
+        if (!skill) throw rpcError(RPC_ERRORS.INVALID_PARAMS, `Unknown skill: ${want}`);
+        return { skill: publicSkill(skill) };
+      }
+
+      case 'resources/list':
+        return {
+          resources: (await skills()).flatMap((s) =>
+            s.resources.map((r) => ({ ...r, name: r.uri.split('/').pop() })),
+          ),
+        };
+
+      case 'resources/read': {
+        const resolved = resolveSkillUri(params.uri, await skills(), skillsDir);
+        if (!resolved || !resolved.rel) {
+          throw rpcError(RPC_ERRORS.INVALID_PARAMS, `Cannot read resource: ${params.uri}`);
+        }
+        try {
+          const content = await readSkillResource(resolved, io);
+          return { contents: [content] };
+        } catch {
+          throw rpcError(RPC_ERRORS.INVALID_PARAMS, `Resource not found: ${params.uri}`);
+        }
+      }
+
+      case 'resources/directory/read': {
+        const resolved = resolveSkillUri(params.uri, await skills(), skillsDir);
+        if (!resolved) {
+          throw rpcError(RPC_ERRORS.INVALID_PARAMS, `Cannot read directory: ${params.uri}`);
+        }
+        try {
+          return { entries: await readSkillDirectory(resolved, io) };
+        } catch {
+          throw rpcError(RPC_ERRORS.INVALID_PARAMS, `Directory not found: ${params.uri}`);
+        }
+      }
+
+      default:
+        throw rpcError(RPC_ERRORS.METHOD_NOT_FOUND, `Method not found: ${method}`);
+    }
+  }
+
+  return {
+    tools: [...MCP_TOOLS],
+    capabilities: CAPABILITIES,
+    serverInfo: SERVER_INFO,
+    handleCall,
+    handleRequest,
+    skills,
+  };
 }

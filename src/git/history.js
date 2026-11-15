@@ -4,6 +4,8 @@
 import { execFileSync } from 'node:child_process';
 import { shannonEntropy } from '../layers/probabilistic.js';
 import { classifyFinding } from '../severity.js';
+import { checkPerformance } from '../performance.js';
+import { checkA11y } from '../a11y.js';
 
 const HISTORY_SECRET_RES = [
   /sk-[A-Za-z0-9_-]{8,}/,
@@ -18,10 +20,35 @@ const SECRET_REWRITE_ADVICE =
   'Remove the value from history with git filter-repo or BFG Repo-Cleaner, then revoke the key immediately.';
 
 const COMMON_PACKAGES = new Set([
-  'lodash', 'express', 'react', 'react-dom', 'next', 'axios', 'moment', 'chalk',
-  'commander', 'typescript', 'jest', 'vitest', 'eslint', 'prettier', 'zod',
-  'uuid', 'dotenv', 'cors', 'jsonwebtoken', 'bcrypt', 'fs-extra', 'glob',
-  'yargs', 'inquirer', 'ora', 'node-fetch', 'ws', 'socket.io', 'mongoose',
+  'lodash',
+  'express',
+  'react',
+  'react-dom',
+  'next',
+  'axios',
+  'moment',
+  'chalk',
+  'commander',
+  'typescript',
+  'jest',
+  'vitest',
+  'eslint',
+  'prettier',
+  'zod',
+  'uuid',
+  'dotenv',
+  'cors',
+  'jsonwebtoken',
+  'bcrypt',
+  'fs-extra',
+  'glob',
+  'yargs',
+  'inquirer',
+  'ora',
+  'node-fetch',
+  'ws',
+  'socket.io',
+  'mongoose',
 ]);
 
 const SUSPICIOUS_TOKENS = /quantum|ultra|hyper|turbo-?ai|magic-?ai|gpt-?kit|super-?ai|neural-?x/i;
@@ -30,7 +57,13 @@ function isSecretCategory(category) {
   return /secret|env|key|credential|token|entropy/i.test(category);
 }
 
-export async function auditHistory({ cwd = '.', maxCommits, secretsOnly = false, registryClient } = {}) {
+export async function auditHistory({
+  cwd = '.',
+  maxCommits,
+  secretsOnly = false,
+  checkPerformance: includePerfA11y = false,
+  registryClient,
+} = {}) {
   let log;
   try {
     const args = ['log', '-p', '--no-color', '--no-ext-diff'];
@@ -41,6 +74,7 @@ export async function auditHistory({ cwd = '.', maxCommits, secretsOnly = false,
   }
 
   const findings = [];
+  const perfChunks = {};
   let commit = null;
   let file = null;
   let newLine = 0;
@@ -71,9 +105,19 @@ export async function auditHistory({ cwd = '.', maxCommits, secretsOnly = false,
       newLine += 1;
       const content = raw.slice(1);
 
+      if (includePerfA11y && file) {
+        (perfChunks[`${commit}:${file}`] ??= { commit, file, added: [] }).added.push({
+          text: content,
+          line: newLine,
+        });
+      }
+
       // Secret signatures on added lines
       if (HISTORY_SECRET_RES.some((re) => re.test(content)) || /\.env$/.test(file ?? '')) {
-        if (HISTORY_SECRET_RES.some((re) => re.test(content)) || /(KEY|SECRET|TOKEN|PASSWORD|URL)\s*=/.test(content)) {
+        if (
+          HISTORY_SECRET_RES.some((re) => re.test(content)) ||
+          /(KEY|SECRET|TOKEN|PASSWORD|URL)\s*=/.test(content)
+        ) {
           push({
             ruleId: 'VG-HIST-001',
             domain: 'SECURITY',
@@ -138,6 +182,23 @@ export async function auditHistory({ cwd = '.', maxCommits, secretsOnly = false,
       }
     } else if (!raw.startsWith('-')) {
       newLine += 1; // context lines advance the new-file counter too
+    }
+  }
+
+  // --check-performance: run the a11y/perf rule packs over the added lines of
+  // each changed file — surfaces severe perf/a11y debt introduced per commit.
+  if (includePerfA11y) {
+    for (const { commit: c, file: f, added } of Object.values(perfChunks)) {
+      const pseudo = added.map((l) => l.text).join('\n');
+      const ctx = { filePath: f };
+      for (const finding of [...checkPerformance(pseudo, ctx), ...checkA11y(pseudo, ctx)]) {
+        push({
+          ...finding,
+          commit: c,
+          file: f,
+          line: added[Math.max(0, finding.line - 1)]?.line ?? finding.line,
+        });
+      }
     }
   }
 

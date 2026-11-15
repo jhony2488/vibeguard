@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// VibeGuard CLI — check / watch / audit-history (docs/03-cli.md).
+// VibeGuard CLI — check / watch / audit-history / mcp (docs/03-cli.md).
 
 import { writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
@@ -10,9 +10,12 @@ import { scanProject } from './scanner.js';
 import { auditHistory } from './git/history.js';
 import { createWatcher, shouldEscalate } from './watcher.js';
 import { toJson, toSarif, renderTerminal } from './report/index.js';
-import { meetsBlocking } from './severity.js';
+import { meetsBlocking, severityAtLeast } from './severity.js';
 import { loadLlm } from './layers/llm.js';
 import { loadClassifier } from './layers/classifier.js';
+import { createNotifier } from './notify.js';
+import { createMcpServer } from './mcp/server.js';
+import { runStdioServer } from './mcp/stdio.js';
 
 const ALL_DOMAINS = ['security', 'perf', 'a11y'];
 
@@ -44,8 +47,10 @@ const FLAG_SPEC = {
 
 export function parseArgs(argv = []) {
   const command = argv[0] ?? 'check';
-  if (!['check', 'watch', 'audit-history'].includes(command)) {
-    throw new Error(`Unknown command: ${command}\nUsage: vibeguard <check|watch|audit-history> [flags]`);
+  if (!['check', 'watch', 'audit-history', 'mcp'].includes(command)) {
+    throw new Error(
+      `Unknown command: ${command}\nUsage: vibeguard <check|watch|audit-history|mcp> [flags]`,
+    );
   }
 
   const cfg = {
@@ -92,29 +97,79 @@ export function parseArgs(argv = []) {
     if (spec === 'value' && value === undefined) throw new Error(`Missing value for --${name}`);
 
     switch (name) {
-      case 'deep': cfg.deep = true; break;
-      case 'deps': cfg.depsOnly = true; break;
-      case 'all': cfg.all = true; cfg.focus = [...ALL_DOMAINS]; break;
-      case 'focus': cfg.focus = String(value).split(',').map((s) => s.trim()); break;
-      case 'history-only': cfg.historyOnly = true; break;
-      case 'staged': cfg.staged = true; break;
-      case 'strict': cfg.strict = true; break;
-      case 'format': cfg.format = value; break;
-      case 'report': cfg.report = true; break;
-      case 'interactive': cfg.interactive = true; break;
-      case 'path': cfg.path = value; cfg.directory = value; break;
-      case 'debounce': cfg.debounceMs = Number(value); break;
-      case 'min-severity': cfg.minSeverity = value; break;
-      case 'notify': cfg.notify = true; break;
-      case 'commits': cfg.maxCommits = Number(value); break;
-      case 'detect-secrets': cfg.detectSecrets = true; break;
-      case 'check-performance': cfg.checkPerformance = true; break;
-      case 'llm-url': cfg.llmUrl = value; break;
-      case 'llm-model': cfg.llmModel = value; break;
-      case 'llm-key': cfg.llmKey = value; break;
-      case 'classifier-model': cfg.classifierModel = value; break;
-      case 'classifier-task': cfg.classifierTask = value; break;
-      case 'no-classifier': cfg.noClassifier = true; break;
+      case 'deep':
+        cfg.deep = true;
+        break;
+      case 'deps':
+        cfg.depsOnly = true;
+        break;
+      case 'all':
+        cfg.all = true;
+        cfg.focus = [...ALL_DOMAINS];
+        break;
+      case 'focus':
+        cfg.focus = String(value)
+          .split(',')
+          .map((s) => s.trim());
+        break;
+      case 'history-only':
+        cfg.historyOnly = true;
+        break;
+      case 'staged':
+        cfg.staged = true;
+        break;
+      case 'strict':
+        cfg.strict = true;
+        break;
+      case 'format':
+        cfg.format = value;
+        break;
+      case 'report':
+        cfg.report = true;
+        break;
+      case 'interactive':
+        cfg.interactive = true;
+        break;
+      case 'path':
+        cfg.path = value;
+        cfg.directory = value;
+        break;
+      case 'debounce':
+        cfg.debounceMs = Number(value);
+        break;
+      case 'min-severity':
+        cfg.minSeverity = value;
+        break;
+      case 'notify':
+        cfg.notify = true;
+        break;
+      case 'commits':
+        cfg.maxCommits = Number(value);
+        break;
+      case 'detect-secrets':
+        cfg.detectSecrets = true;
+        break;
+      case 'check-performance':
+        cfg.checkPerformance = true;
+        break;
+      case 'llm-url':
+        cfg.llmUrl = value;
+        break;
+      case 'llm-model':
+        cfg.llmModel = value;
+        break;
+      case 'llm-key':
+        cfg.llmKey = value;
+        break;
+      case 'classifier-model':
+        cfg.classifierModel = value;
+        break;
+      case 'classifier-task':
+        cfg.classifierTask = value;
+        break;
+      case 'no-classifier':
+        cfg.noClassifier = true;
+        break;
     }
   }
 
@@ -137,7 +192,10 @@ function createRegistryClient() {
 function stagedFiles(cwd) {
   try {
     const out = execFileSync('git', ['diff', '--staged', '--name-only'], { cwd, encoding: 'utf8' });
-    const files = out.split('\n').map((s) => s.trim()).filter(Boolean);
+    const files = out
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
     return files.length ? new Set(files) : null;
   } catch {
     return null;
@@ -177,6 +235,18 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
   const classifier =
     deps.classifier ?? loadClassifier({ flags: cfg, modelLoader: deps.classifierLoader });
   const registryClient = deps.registryClient ?? createRegistryClient();
+  const notifier = deps.notifier ?? createNotifier();
+
+  // MCP server mode — the globally installed CLI doubles as a stdio MCP
+  // server (docs/04-mcp-server.md). stdout carries JSON-RPC only.
+  if (cfg.command === 'mcp') {
+    const server = createMcpServer({ llm, classifier, registryClient });
+    const { done } = runStdioServer(server, {
+      input: deps.input ?? process.stdin,
+      output: deps.output ?? process.stdout,
+    });
+    return { server, done, exitCode: 0 };
+  }
 
   if (cfg.command === 'watch') {
     const watcher = createWatcher({
@@ -185,19 +255,47 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
       watcherFactory: deps.watcherFactory,
       onBatch: async (files) => {
         for (const f of files) {
-          const report = await scanProject({ directory: path.dirname(f), deep: false, llm, registryClient });
+          const report = await scanProject({
+            directory: path.dirname(f),
+            deep: false,
+            llm,
+            registryClient,
+            focus: cfg.focus,
+          });
+          report.findings = severityAtLeast(report.findings, cfg.minSeverity ?? 'Low');
           process.stdout.write(renderTerminal(report) + '\n');
+          if (cfg.notify && meetsBlocking(report.findings, 'High')) {
+            notifier.notify({
+              title: 'VibeGuard',
+              message: `${report.findings.length} finding(s) in ${path.basename(f)} — worst: ${report.findings[0]?.severity}`,
+            });
+          }
         }
       },
       escalateOn: (files) => files.some((f) => shouldEscalate({ filePath: f })),
       onEscalate: async (files) => {
         for (const f of files) {
-          const report = await scanProject({ directory: path.dirname(f), deep: true, llm, registryClient });
+          const report = await scanProject({
+            directory: path.dirname(f),
+            deep: true,
+            llm,
+            registryClient,
+            focus: cfg.focus,
+          });
+          report.findings = severityAtLeast(report.findings, cfg.minSeverity ?? 'Low');
           process.stdout.write(renderTerminal(report) + '\n');
+          if (cfg.notify && meetsBlocking(report.findings, 'High')) {
+            notifier.notify({
+              title: 'VibeGuard',
+              message: `${report.findings.length} finding(s) in ${path.basename(f)} — worst: ${report.findings[0]?.severity}`,
+            });
+          }
         }
       },
     });
-    process.stdout.write(`VibeGuard watching ${cfg.path ?? dir} (debounce ${cfg.debounceMs ?? 1000}ms)\n`);
+    process.stdout.write(
+      `VibeGuard watching ${cfg.path ?? dir} (debounce ${cfg.debounceMs ?? 1000}ms)\n`,
+    );
     return { watcher, exitCode: 0 };
   }
 
@@ -206,6 +304,7 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
       cwd: dir,
       maxCommits: cfg.maxCommits,
       secretsOnly: cfg.detectSecrets,
+      checkPerformance: cfg.checkPerformance,
       registryClient,
     });
     const report = { findings, history: { findings } };
@@ -214,7 +313,8 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
     } else {
       await emit({ findings }, { ...cfg, report: false }, dir);
     }
-    if (cfg.report) await writeFile(path.join(dir, 'vibeguard-report.html'), htmlReport(report), 'utf8');
+    if (cfg.report)
+      await writeFile(path.join(dir, 'vibeguard-report.html'), htmlReport(report), 'utf8');
     return { exitCode: cfg.strict && meetsBlocking(findings, cfg.minSeverity ?? 'High') ? 1 : 0 };
   }
 
@@ -224,6 +324,7 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
       cwd: dir,
       maxCommits: cfg.maxCommits,
       secretsOnly: cfg.detectSecrets,
+      checkPerformance: cfg.checkPerformance,
       registryClient,
     });
     const report = { findings: [], history: { findings: history } };
@@ -232,13 +333,15 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
     } else {
       await emit({ findings: history }, { ...cfg, report: false }, dir);
     }
-    if (cfg.report) await writeFile(path.join(dir, 'vibeguard-report.html'), htmlReport(report), 'utf8');
+    if (cfg.report)
+      await writeFile(path.join(dir, 'vibeguard-report.html'), htmlReport(report), 'utf8');
     return { exitCode: 0 };
   }
 
   const report = await scanProject({
     directory: dir,
     deep: cfg.deep,
+    depsOnly: cfg.depsOnly,
     llm,
     classifier,
     registryClient,
@@ -248,7 +351,9 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
   if (cfg.staged) {
     const staged = stagedFiles(dir);
     if (staged) {
-      report.findings = report.findings.filter((f) => staged.has(f.file) || staged.has(f.file?.replace(/^\.\//, '')));
+      report.findings = report.findings.filter(
+        (f) => staged.has(f.file) || staged.has(f.file?.replace(/^\.\//, '')),
+      );
     }
   }
 
@@ -264,7 +369,7 @@ const invokedAsScript =
 if (invokedAsScript) {
   main(process.argv.slice(2))
     .then((res) => {
-      const code = typeof res === 'number' ? res : res?.exitCode ?? 0;
+      const code = typeof res === 'number' ? res : (res?.exitCode ?? 0);
       if (code !== 0) process.exitCode = code;
     })
     .catch((err) => {

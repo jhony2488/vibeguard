@@ -29,5 +29,15 @@ export function classifyFinding({ category = '' } = {}) {
 
 export function meetsBlocking(findings = [], minSeverity = 'High') {
   const threshold = ORDER.indexOf(minSeverity);
-  return findings.some((f) => ORDER.indexOf(f.severity) >= threshold && ORDER.indexOf(f.severity) !== -1);
+  return findings.some(
+    (f) => ORDER.indexOf(f.severity) >= threshold && ORDER.indexOf(f.severity) !== -1,
+  );
+}
+
+// Filters a finding list down to `minSeverity` and above — used by
+// `watch --min-severity` to surface only severe findings.
+export function severityAtLeast(findings = [], minSeverity = 'Low') {
+  const threshold = ORDER.indexOf(minSeverity);
+  if (threshold === -1) return findings;
+  return findings.filter((f) => ORDER.indexOf(f.severity) >= threshold);
 }

@@ -1,12 +1,19 @@
 {
   "name": "vibeguard-cli",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Security, accessibility & performance auditing for AI-generated (vibecoded) code",
   "type": "module",
   "bin": {
     "vibeguard": "./src/cli.js"
   },
+  "files": [
+    "src",
+    "skills",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "cli": "node src/cli.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
