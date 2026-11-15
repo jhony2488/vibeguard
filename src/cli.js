@@ -11,7 +11,8 @@ import { auditHistory } from './git/history.js';
 import { createWatcher, shouldEscalate } from './watcher.js';
 import { toJson, toSarif, renderTerminal } from './report/index.js';
 import { meetsBlocking } from './severity.js';
-import { createLocalEchoLlm } from './layers/llm.js';
+import { loadLlm } from './layers/llm.js';
+import { loadClassifier } from './layers/classifier.js';
 
 const ALL_DOMAINS = ['security', 'perf', 'a11y'];
 
@@ -33,6 +34,12 @@ const FLAG_SPEC = {
   commits: 'value',
   'detect-secrets': 'boolean',
   'check-performance': 'boolean',
+  'llm-url': 'value',
+  'llm-model': 'value',
+  'llm-key': 'value',
+  'classifier-model': 'value',
+  'classifier-task': 'value',
+  'no-classifier': 'boolean',
 };
 
 export function parseArgs(argv = []) {
@@ -61,6 +68,12 @@ export function parseArgs(argv = []) {
     maxCommits: undefined,
     detectSecrets: false,
     checkPerformance: false,
+    llmUrl: undefined,
+    llmModel: undefined,
+    llmKey: undefined,
+    classifierModel: undefined,
+    classifierTask: undefined,
+    noClassifier: false,
   };
 
   for (let i = 1; i < argv.length; i++) {
@@ -96,6 +109,12 @@ export function parseArgs(argv = []) {
       case 'commits': cfg.maxCommits = Number(value); break;
       case 'detect-secrets': cfg.detectSecrets = true; break;
       case 'check-performance': cfg.checkPerformance = true; break;
+      case 'llm-url': cfg.llmUrl = value; break;
+      case 'llm-model': cfg.llmModel = value; break;
+      case 'llm-key': cfg.llmKey = value; break;
+      case 'classifier-model': cfg.classifierModel = value; break;
+      case 'classifier-task': cfg.classifierTask = value; break;
+      case 'no-classifier': cfg.noClassifier = true; break;
     }
   }
 
@@ -154,7 +173,9 @@ async function emit(report, cfg, dir) {
 export async function main(argv = process.argv.slice(2), deps = {}) {
   const cfg = parseArgs(argv);
   const dir = cfg.directory ?? '.';
-  const llm = deps.llm ?? createLocalEchoLlm();
+  const llm = deps.llm ?? (await loadLlm({ flags: cfg, cwd: dir }));
+  const classifier =
+    deps.classifier ?? loadClassifier({ flags: cfg, modelLoader: deps.classifierLoader });
   const registryClient = deps.registryClient ?? createRegistryClient();
 
   if (cfg.command === 'watch') {
@@ -219,7 +240,8 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
     directory: dir,
     deep: cfg.deep,
     llm,
-    registryClient: cfg.depsOnly ? registryClient : registryClient,
+    classifier,
+    registryClient,
     focus: cfg.focus,
   });
 

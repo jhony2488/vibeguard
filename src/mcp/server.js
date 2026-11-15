@@ -7,7 +7,8 @@ import { explainIssue } from '../layers/semantic.js';
 import { auditHistory } from '../git/history.js';
 import { analyzeDeterministic } from '../layers/deterministic.js';
 import { createWatcher } from '../watcher.js';
-import { createLocalEchoLlm } from '../layers/llm.js';
+import { createLocalEchoLlm, createHttpLlm } from '../layers/llm.js';
+import { createLocalClassifier } from '../layers/classifier.js';
 
 export const MCP_TOOLS = [
   'vibeguard_scan_file',
@@ -39,22 +40,58 @@ function addedLines(gitDiff = '') {
 }
 
 export function createMcpServer(deps = {}) {
-  const llm = deps.llm ?? createLocalEchoLlm();
+  const defaultLlm = deps.llm ?? createLocalEchoLlm();
   const registryClient = deps.registryClient;
   const watchers = new Map();
 
-  async function handleCall(name, params = {}) {
-    switch (name) {
-      case 'vibeguard_scan_file':
-        return scanFile({ filePath: params.filePath, depth: params.depth ?? 'fast', llm, registryClient });
+  // Per-call model resolution — the agent picks models by project context.
+  // factories let tools instantiate models on demand without forcing config.
+  const resolveLlm = (params) =>
+    params.model || params.llmUrl
+      ? createHttpLlm({
+          baseUrl: params.llmUrl ?? 'http://localhost:11434',
+          apiKey: params.llmKey,
+          model: params.model,
+        })
+      : (deps.llmFactory?.(params) ?? defaultLlm);
 
-      case 'vibeguard_scan_project':
-        return scanProject({
+  const resolveClassifier = (params) =>
+    params.classifierModel
+      ? (deps.classifierFactory?.(params) ??
+        createLocalClassifier({ model: params.classifierModel, task: params.classifierTask }))
+      : (deps.classifier ?? null);
+
+  const modelsUsed = (l, c) => ({
+    llm: l?.model ?? l?.provider ?? 'echo',
+    classifier: c?.model ?? null,
+  });
+
+  async function handleCall(name, params = {}) {
+    const llm = resolveLlm(params);
+    const classifier = resolveClassifier(params);
+
+    switch (name) {
+      case 'vibeguard_scan_file': {
+        const report = await scanFile({
+          filePath: params.filePath,
+          depth: params.depth ?? 'fast',
+          llm,
+          classifier,
+          registryClient,
+        });
+        return { ...report, modelsUsed: modelsUsed(llm, classifier) };
+      }
+
+      case 'vibeguard_scan_project': {
+        const report = await scanProject({
           directory: params.directory ?? '.',
           llm,
+          classifier,
           registryClient,
           ignore: { vibeguardignore: params.ignorePatterns ?? [] },
         });
+        return { ...report, modelsUsed: modelsUsed(llm, classifier) };
+      }
 
       case 'vibeguard_audit_diff': {
         const added = addedLines(params.gitDiff);
@@ -66,6 +103,7 @@ export function createMcpServer(deps = {}) {
         return {
           findings,
           blocked: findings.some((f) => f.severity === 'Critical' || f.severity === 'High'),
+          modelsUsed: modelsUsed(llm, classifier),
         };
       }
 
