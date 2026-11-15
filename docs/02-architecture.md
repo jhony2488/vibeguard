@@ -36,6 +36,8 @@ To deliver fast execution without compromising analysis depth, VibeGuard uses a 
 
 Focused on strict, immutable, ultra-low-latency rules. Its goal is to filter obvious problems and direct compliance violations before consuming computationally denser resources.
 
+> **Implementation note (v0):** the code model consumed by this layer is built by `src/analyzers/codeModel.js` — a regex/heuristic analyzer behind a stable interface. Swapping in a real AST parser (e.g., `@babel/parser`) is a planned upgrade that won't change the layer contracts.
+
 - **AST analysis** — decomposes source code into syntactic nodes to identify dangerous function calls (e.g., dynamic code execution), permissive CORS configurations, or explicit SSL/TLS disabling.
 - **Package-registry verification** — analyzes dependency manifest files and compares requested libraries against public package registries, flagging names suspicious of having been invented by language models.
 - **Strict regular expressions** — searches for known signatures of private keys, cloud-service tokens, and structured credential formats.

@@ -61,3 +61,33 @@ Funcionalidade: Tools do servidor MCP e integração com agentes
     E env contém "VIBEGUARD_LLM_KEY"
     Quando o cliente inicia a sessão
     Então as tools MCP do VibeGuard ficam disponíveis para o agente
+
+  @skills @sep-2640
+  Cenário: Servidor declara a extensão de skills
+    Quando o cliente inspeciona as capabilities do servidor
+    Então a extensão "io.modelcontextprotocol/skills" está declarada
+    E a capability "resources" está presente
+
+  @skills @sep-2640
+  Esquema do Cenário: Servidor enumera as skills servidas
+    Quando o cliente chama "skills/list"
+    Então a skill "<skill>" está listada
+    E sua entrada carrega o frontmatter do SKILL.md e um manifesto de resources
+
+    Exemplos:
+      | skill                   |
+      | fix-vibecoding-flaws    |
+      | secure-review-checklist |
+
+  @skills @sep-2640
+  Cenário: Agente carrega o playbook de remediação após um finding
+    Dado que "vibeguard_audit_diff" reportou um finding com ruleId "VG-SEC-001"
+    Quando o agente lê "skill://fix-vibecoding-flaws/rules/VG-SEC-001.md" via "resources/read"
+    Então a reescrita segura e os passos de verificação do playbook estão disponíveis
+    E o agente re-executa a auditoria para confirmar a correção
+
+  @skills @sep-2640
+  Cenário: Navegar nos arquivos de apoio de uma skill
+    Dado que o servidor declarou suporte a "directoryRead"
+    Quando o cliente chama "resources/directory/read" em "skill://fix-vibecoding-flaws/rules"
+    Então os arquivos de playbook são listados como resources

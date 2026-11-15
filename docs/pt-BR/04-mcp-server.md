@@ -45,6 +45,110 @@ O VibeGuard opera como um assistente de análise de segurança que pode ser cons
 - **Parâmetros:** `ruleId: string`, `codeSnippet: string`
 - **Função:** chama a camada semântica (LLM) para explicar por que aquele padrão "vibecodado" é um risco de segurança e gera o fix correto.
 
+## Skills Servidas (roadmap — SEP-2640)
+
+Além das tools, a extensão oficial de **Skills** do MCP (`io.modelcontextprotocol/skills`, [SEP-2640](https://modelcontextprotocol.io/seps/2640-skills-extension), Final) permite que um servidor entregue Agent Skills — diretórios contendo um `SKILL.md` mais arquivos de apoio — como resources MCP sob URIs `skill://`. Servidores implementam `skills/list` e `skills/get`; clientes leem cada arquivo via `resources/read` (e opcionalmente navegam diretórios via `resources/directory/read`).
+
+Para o VibeGuard, esse é o caminho canônico para sair de *detectar* falhas e passar a *ensinar o agente a corrigi-las* — orientação de correção versionada junto com a ruleset:
+
+| Skill | Função |
+| --- | --- |
+| `fix-vibecoding-flaws` | Playbooks de remediação por regra `VG-*` — reescritas seguras e passos de verificação |
+| `secure-review-checklist` | Fluxo guiado de revisão para diffs gerados por agentes |
+
+Enquanto `vibeguard_audit_diff` responde *"essa mudança é segura?"*, uma skill servida responde *"como eu escrevo isso corretamente?"* — ex.: após um finding, o agente carrega o playbook daquela regra em vez de improvisar um fix.
+
+### Estrutura de diretórios das skills
+
+As skills são distribuídas dentro do pacote `@vibeguard/mcp-server` sob `skills/`, um diretório por skill — o nome do diretório é o `name` da skill:
+
+```text
+skills/
+  fix-vibecoding-flaws/
+    SKILL.md                  # frontmatter + como escolher o playbook certo
+    rules/
+      VG-SEC-001.md           # playbook: segredos expostos → env vars / secret managers
+      VG-DEP-001.md           # playbook: dependência alucinada → alternativa verificada
+      VG-CORS-001.md          # playbook: CORS permissivo → allowlist explícita
+      ...                     # um arquivo por regra (VG-SEC, VG-DEP, VG-A11Y, VG-PERF, VG-HIST)
+  secure-review-checklist/
+    SKILL.md                  # frontmatter + o fluxo de revisão
+    checklists/
+      agent-diff.md           # loop de auto-auditoria: gerar → audit_diff → corrigir → re-auditar
+      pre-release.md          # scan do projeto + auditoria de histórico git antes do release
+```
+
+Cada `SKILL.md` começa com frontmatter YAML (`name`, `description`, `metadata.version`); o corpo ensina o agente *quando* carregar a skill e *como* navegar nos arquivos de apoio — ex.: mapeando o `ruleId` de um finding para `rules/<ruleId>.md`:
+
+```yaml
+---
+name: fix-vibecoding-flaws
+description: Remediate VibeGuard findings. Use when a vibeguard_* tool reports a VG-* ruleId — loads the matching playbook for a secure rewrite and its verification steps.
+metadata:
+  version: "1.0.0"
+---
+```
+
+### Mapeamento de resources (URIs `skill://`)
+
+Cada arquivo de um diretório de skill é exposto como um resource MCP — `skill://<skill-path>/<file-path>`:
+
+| Arquivo | URI do resource |
+| --- | --- |
+| `fix-vibecoding-flaws/SKILL.md` | `skill://fix-vibecoding-flaws/SKILL.md` |
+| `fix-vibecoding-flaws/rules/VG-SEC-001.md` | `skill://fix-vibecoding-flaws/rules/VG-SEC-001.md` |
+| `secure-review-checklist/checklists/agent-diff.md` | `skill://secure-review-checklist/checklists/agent-diff.md` |
+
+Referências relativas dentro de um `SKILL.md` (ex.: `rules/VG-SEC-001.md`) são resolvidas contra o diretório raiz da skill, exatamente como em skills de filesystem.
+
+### Superfície de protocolo
+
+O VibeGuard declara a extensão — mais `directoryRead`, para que agentes possam navegar em `rules/` sem conhecer de antemão todos os IDs `VG-*`:
+
+```json
+{
+  "capabilities": {
+    "resources": {},
+    "extensions": {
+      "io.modelcontextprotocol/skills": { "directoryRead": true }
+    }
+  }
+}
+```
+
+| Método | Função |
+| --- | --- |
+| `skills/list` | Enumera as skills servidas — cada entrada carrega o frontmatter do `SKILL.md` na íntegra mais um manifesto `resources` completo (`{uri, digest, size}` por arquivo, SHA-256) |
+| `skills/get` | Retorna a entrada de uma única skill pela URI do `SKILL.md` — ex.: para atualizar digests após uma mudança na ruleset |
+| `resources/read` | Leitura MCP padrão de qualquer arquivo `skill://` — como o agente efetivamente busca o `SKILL.md` ou um playbook |
+| `resources/directory/read` | Lista os filhos diretos de um diretório (arquivos, e subdiretórios como `inode/directory`) — ex.: `skill://fix-vibecoding-flaws/rules` |
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "skills/get",
+  "params": { "uri": "skill://fix-vibecoding-flaws/SKILL.md" }
+}
+```
+
+### Fluxo de remediação
+
+```text
+[ vibeguard_audit_diff ] ── finding { ruleId: "VG-SEC-001", severity: "Critical" }
+            │
+            ▼
+[ resources/read skill://fix-vibecoding-flaws/SKILL.md ]   (agente carrega a skill)
+            │
+            ▼
+[ resources/read skill://fix-vibecoding-flaws/rules/VG-SEC-001.md ]
+            │
+            ▼
+[ Agente aplica a reescrita segura do playbook ──► re-executa audit_diff para verificar ]
+```
+
+> **Ressalva de suporte dos clientes:** o servidor apenas *serve* o conteúdo da skill — é o host (Claude Code, Cursor, Devin, …) que decide quando carregá-la no contexto do modelo e é dono da verificação e da aprovação: pelo modelo de segurança da SEP-2640, o conteúdo de skill é entrada não confiável, digests garantem consistência e não confiança, e aprovações persistidas ficam vinculadas ao conjunto de arquivos da skill. A SEP já é Final, mas a adoção pelos hosts ainda está engatinhando, portanto isso permanece um item de roadmap, e não uma feature comprometida.
+
 ## Integração por Ferramenta / IDE
 
 ### A. Cursor e Devin (via MCP)
@@ -222,4 +326,4 @@ Edite `~/.gemini/settings.json`:
 
 Cenários BDD cobrindo este documento estão em [`features/pt-BR/`](../../features/pt-BR/):
 
-- [`mcp-server.feature`](../../features/pt-BR/mcp-server.feature) — tools MCP, loop de auto-auditoria do agente, configuração via `mcp.json`
+- [`mcp-server.feature`](../../features/pt-BR/mcp-server.feature) — tools MCP, loop de auto-auditoria do agente, configuração via `mcp.json`, skills servidas (SEP-2640)

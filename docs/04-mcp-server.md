@@ -45,6 +45,110 @@ VibeGuard operates as a security-analysis assistant that can be consumed at thre
 - **Params:** `ruleId: string`, `codeSnippet: string`
 - **Purpose:** calls the semantic layer (LLM) to explain why a given "vibecoded" pattern is a security risk and generates the correct fix.
 
+## Served Skills (roadmap — SEP-2640)
+
+Beyond tools, the official MCP **Skills extension** (`io.modelcontextprotocol/skills`, [SEP-2640](https://modelcontextprotocol.io/seps/2640-skills-extension), Final) lets a server ship Agent Skills — directories containing a `SKILL.md` plus supporting files — as MCP resources under `skill://` URIs. Servers implement `skills/list` and `skills/get`; clients read each file through `resources/read` (and optionally navigate directories via `resources/directory/read`).
+
+For VibeGuard, this is the canonical path to go from *detecting* flaws to *teaching the agent how to fix them* — remediation guidance versioned alongside the ruleset:
+
+| Skill | Purpose |
+| --- | --- |
+| `fix-vibecoding-flaws` | Remediation playbooks per `VG-*` rule — secure rewrites and verification steps |
+| `secure-review-checklist` | Guided review workflow for agent-generated diffs |
+
+Where `vibeguard_audit_diff` answers *"is this change safe?"*, a served skill answers *"how do I write it correctly?"* — e.g., after a finding, the agent loads the playbook for that rule instead of improvising a fix.
+
+### Skill directory layout
+
+Skills ship inside the `@vibeguard/mcp-server` package under `skills/`, one directory per skill — the directory name is the skill's `name`:
+
+```text
+skills/
+  fix-vibecoding-flaws/
+    SKILL.md                  # frontmatter + how to pick the right playbook
+    rules/
+      VG-SEC-001.md           # playbook: exposed secrets → env vars / secret managers
+      VG-DEP-001.md           # playbook: hallucinated dependency → verified alternative
+      VG-CORS-001.md          # playbook: permissive CORS → explicit allowlist
+      ...                     # one file per rule (VG-SEC, VG-DEP, VG-A11Y, VG-PERF, VG-HIST)
+  secure-review-checklist/
+    SKILL.md                  # frontmatter + the review workflow
+    checklists/
+      agent-diff.md           # self-audit loop: generate → audit_diff → fix → re-audit
+      pre-release.md          # project scan + git-history audit before shipping
+```
+
+Each `SKILL.md` starts with YAML frontmatter (`name`, `description`, `metadata.version`); the body teaches the agent *when* to load the skill and *how* to navigate its supporting files — e.g., mapping a finding's `ruleId` to `rules/<ruleId>.md`:
+
+```yaml
+---
+name: fix-vibecoding-flaws
+description: Remediate VibeGuard findings. Use when a vibeguard_* tool reports a VG-* ruleId — loads the matching playbook for a secure rewrite and its verification steps.
+metadata:
+  version: "1.0.0"
+---
+```
+
+### Resource mapping (`skill://` URIs)
+
+Every file in a skill directory is exposed as an MCP resource — `skill://<skill-path>/<file-path>`:
+
+| File | Resource URI |
+| --- | --- |
+| `fix-vibecoding-flaws/SKILL.md` | `skill://fix-vibecoding-flaws/SKILL.md` |
+| `fix-vibecoding-flaws/rules/VG-SEC-001.md` | `skill://fix-vibecoding-flaws/rules/VG-SEC-001.md` |
+| `secure-review-checklist/checklists/agent-diff.md` | `skill://secure-review-checklist/checklists/agent-diff.md` |
+
+Relative references inside a `SKILL.md` (e.g., `rules/VG-SEC-001.md`) resolve against the skill's root directory, exactly as filesystem skills do.
+
+### Protocol surface
+
+VibeGuard declares the extension — plus `directoryRead`, so agents can browse `rules/` without knowing every `VG-*` ID upfront:
+
+```json
+{
+  "capabilities": {
+    "resources": {},
+    "extensions": {
+      "io.modelcontextprotocol/skills": { "directoryRead": true }
+    }
+  }
+}
+```
+
+| Method | Purpose |
+| --- | --- |
+| `skills/list` | Enumerates the served skills — each entry carries the verbatim `SKILL.md` frontmatter plus a complete `resources` manifest (`{uri, digest, size}` per file, SHA-256) |
+| `skills/get` | Returns a single skill's entry by `SKILL.md` URI — e.g., to refresh digests after a ruleset update |
+| `resources/read` | Base MCP read of any `skill://` file — how the agent actually fetches `SKILL.md` or a playbook |
+| `resources/directory/read` | Lists a directory's direct children (files, and subdirectories as `inode/directory`) — e.g., `skill://fix-vibecoding-flaws/rules` |
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "skills/get",
+  "params": { "uri": "skill://fix-vibecoding-flaws/SKILL.md" }
+}
+```
+
+### Remediation flow
+
+```text
+[ vibeguard_audit_diff ] ── finding { ruleId: "VG-SEC-001", severity: "Critical" }
+            │
+            ▼
+[ resources/read skill://fix-vibecoding-flaws/SKILL.md ]   (agent loads the skill)
+            │
+            ▼
+[ resources/read skill://fix-vibecoding-flaws/rules/VG-SEC-001.md ]
+            │
+            ▼
+[ Agent applies the playbook's secure rewrite ──► re-runs audit_diff to verify ]
+```
+
+> **Client support caveat:** the server only *serves* skill content — the host (Claude Code, Cursor, Devin, …) decides when to load it into model context and owns verification and approval: per SEP-2640's security model, skill content is untrusted input, digests guarantee consistency rather than trust, and persisted approvals are bound to the skill's file set. The SEP is Final, but host adoption is still ramping up, so this remains a roadmap item rather than a committed feature.
+
 ## Per-Tool / IDE Integration
 
 ### A. Cursor & Devin (via MCP)
@@ -222,4 +326,4 @@ Edit `~/.gemini/settings.json`:
 
 BDD scenarios covering this document live in [`features/`](../features/):
 
-- [`mcp-server.feature`](../features/mcp-server.feature) — MCP tools, agent self-audit loop, `mcp.json` configuration
+- [`mcp-server.feature`](../features/mcp-server.feature) — MCP tools, agent self-audit loop, `mcp.json` configuration, served skills (SEP-2640)
