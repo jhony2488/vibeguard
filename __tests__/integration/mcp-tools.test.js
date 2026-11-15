@@ -1,8 +1,9 @@
 // features/mcp-server.feature — tool surface, audit_diff agent loop, explain_issue
-import { describe, test, expect, jest } from '@jest/globals';
+import { describe, test, expect, jest, beforeAll, afterAll } from '@jest/globals';
 import { createMcpServer } from '../../src/mcp/server.js';
 import { createMockLlm } from '../helpers/mockLlm.js';
 import { createMockRegistry } from '../helpers/mockRegistry.js';
+import { makeTmpDir, writeTmpFile, cleanup } from '../helpers/tmpProject.js';
 
 const makeServer = () =>
   createMcpServer({
@@ -70,5 +71,57 @@ describe('vibeguard_explain_issue — semantic explanation', () => {
 
     expect(out.explanation).toMatch(/cors|origin|risk/i);
     expect(out.patch).toContain('ALLOWED_ORIGINS');
+  });
+});
+
+describe('per-call model selection — agent picks models by project context', () => {
+  let dir, file;
+  beforeAll(async () => {
+    dir = await makeTmpDir();
+    file = await writeTmpFile(dir, 'api.ts', `const key = "sk-proj-abc123def456";\napp.use(cors({ origin: "*" }));`);
+  });
+  afterAll(async () => cleanup(dir));
+
+  // features/mcp-server.feature — agent chooses the model/classifier per call
+  test('scan_file accepts model params and surfaces them in modelsUsed', async () => {
+    const server = makeServer();
+    const out = await server.handleCall('vibeguard_scan_file', {
+      filePath: file,
+      model: 'codellama',
+      llmUrl: 'http://localhost:11434',
+    });
+
+    expect(out.modelsUsed.llm).toBe('codellama');
+  });
+
+  test('scan_file accepts a classifierModel for Layer-2.5 checks', async () => {
+    const classifier = {
+      model: 'secret-detector',
+      task: 'text-classification',
+      provider: 'local',
+      classify: async () => ({ label: 'SECRET', score: 0.9 }),
+    };
+    const server = createMcpServer({
+      llm: createMockLlm(),
+      registryClient: createMockRegistry(),
+      classifierFactory: (params) => (params.classifierModel ? classifier : null),
+    });
+
+    const out = await server.handleCall('vibeguard_scan_file', {
+      filePath: file,
+      classifierModel: 'secret-detector',
+    });
+
+    expect(out.modelsUsed.classifier).toBe('secret-detector');
+  });
+
+  test('audit_diff surfaces modelsUsed alongside findings', async () => {
+    const server = makeServer();
+    const out = await server.handleCall('vibeguard_audit_diff', {
+      gitDiff: '+const k = "sk-proj-abc123def456";',
+    });
+
+    expect(out.modelsUsed).toBeDefined();
+    expect(out.findings.length).toBeGreaterThan(0);
   });
 });

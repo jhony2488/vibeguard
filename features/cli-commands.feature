@@ -65,3 +65,15 @@ Feature: CLI commands and output modes
     When I run "vibeguard check --report"
     Then a static report file "vibeguard-report.html" is generated
     And it summarizes the security, performance, and accessibility posture
+
+  @llm @config
+  Scenario: Configure an LLM provider for the semantic layer
+    When I run "vibeguard check --deep --llm-url http://localhost:11434 --llm-model codellama"
+    Then the semantic layer uses the configured OpenAI-compatible endpoint
+    And remote providers receive sanitized snippets only
+
+  @classifier @local-models
+  Scenario: Attach a local Hugging Face classifier
+    When I run "vibeguard check --classifier-model secret-detector --classifier-task token-classification"
+    Then the probabilistic layer includes findings from the local model
+    And "--no-classifier" disables it entirely

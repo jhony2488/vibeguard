@@ -66,3 +66,15 @@ Funcionalidade: Comandos da CLI e modos de saída
     Quando eu executo "vibeguard check --report"
     Então um arquivo estático "vibeguard-report.html" é gerado
     E ele sumariza o panorama de segurança, performance e acessibilidade
+
+  @llm @config
+  Cenário: Configurar um provedor LLM para a camada semântica
+    Quando eu executo "vibeguard check --deep --llm-url http://localhost:11434 --llm-model codellama"
+    Então a camada semântica usa o endpoint compatível com OpenAI configurado
+    E provedores remotos recebem apenas snippets sanitizados
+
+  @classifier @local-models
+  Cenário: Anexar um classificador local do Hugging Face
+    Quando eu executo "vibeguard check --classifier-model secret-detector --classifier-task token-classification"
+    Então a camada probabilística inclui achados do modelo local
+    E "--no-classifier" desativa-o completamente

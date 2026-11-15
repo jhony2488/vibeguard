@@ -75,6 +75,31 @@ describe('CLI argument parsing', () => {
     expect(cfg.detectSecrets).toBe(true);
   });
 
+  // features/cli-commands.feature — LLM provider flags
+  test('--llm-url/--llm-model/--llm-key configure the semantic provider', () => {
+    const cfg = parseArgs([
+      'check',
+      '--llm-url', 'http://localhost:11434',
+      '--llm-model', 'codellama',
+      '--llm-key', 'abc',
+    ]);
+    expect(cfg.llmUrl).toBe('http://localhost:11434');
+    expect(cfg.llmModel).toBe('codellama');
+    expect(cfg.llmKey).toBe('abc');
+  });
+
+  // features/cli-commands.feature — local classifier flags
+  test('--classifier-model/--classifier-task/--no-classifier configure local models', () => {
+    const cfg = parseArgs([
+      'check',
+      '--classifier-model', 'secret-detector',
+      '--classifier-task', 'token-classification',
+    ]);
+    expect(cfg.classifierModel).toBe('secret-detector');
+    expect(cfg.classifierTask).toBe('token-classification');
+    expect(parseArgs(['check', '--no-classifier']).noClassifier).toBe(true);
+  });
+
   test('unknown flags are rejected with a usage error', () => {
     expect(() => parseArgs(['check', '--nope'])).toThrow(/unknown|usage/i);
   });

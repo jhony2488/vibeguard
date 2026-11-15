@@ -1,7 +1,8 @@
 // features/deterministic-scan.feature + probabilistic-scan.feature + semantic-audit.feature
 // Full scan pipeline over the vulnerable fixture project.
-import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
+import { describe, test, expect, beforeAll, afterAll, jest } from '@jest/globals';
 import { scanProject, scanFile } from '../../src/scanner.js';
+import { createHttpLlm } from '../../src/layers/llm.js';
 import { createMockLlm } from '../helpers/mockLlm.js';
 import { createMockRegistry } from '../helpers/mockRegistry.js';
 import { copyFixtureProject, cleanup } from '../helpers/tmpProject.js';
@@ -110,5 +111,31 @@ describe('privacy — remote LLM path', () => {
       expect(arg.code ?? '').not.toContain('sk-proj-abc123def456ghi789jkl000mno111pqr222stu333');
       expect(arg.code ?? '').not.toContain('postgres://admin:hunter2');
     }
+  });
+});
+
+describe('real HTTP LLM client — end-to-end wiring', () => {
+  // features/semantic-audit.feature — "Semantic layer runs only on flagged or deep-scan files"
+  test("scanFile depth 'full' posts sanitized+raw code to an OpenAI-compatible endpoint", async () => {
+    const fetchImpl = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: '{"findings":[]}' } }],
+      }),
+    }));
+    const llm = createHttpLlm({ baseUrl: 'http://localhost:11434', model: 'codellama', fetchImpl });
+
+    await scanFile({
+      filePath: `${dir}/src/auth.ts`,
+      depth: 'full',
+      llm,
+      registryClient: createMockRegistry(),
+    });
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'http://localhost:11434/v1/chat/completions',
+      expect.objectContaining({ method: 'POST' }),
+    );
   });
 });

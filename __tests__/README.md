@@ -4,7 +4,7 @@
 
 Spec-first suite translating every Gherkin scenario in [`features/`](../features/) (and its Portuguese mirror [`features/pt-BR/`](../features/pt-BR/)) into executable Jest tests.
 
-> **Status: TDD-red by design.** The implementation does not exist yet — these tests define the expected public contract of `src/` and will fail (module-not-found) until the implementation lands.
+> **Status: green.** The `src/` contract below is implemented — this document remains the canonical reference; update it whenever the public API evolves.
 
 ## Running
 
@@ -23,8 +23,8 @@ The suite exercises this public API surface. It is a **living contract** — if 
 
 ```text
 src/cli.js              → main(argv) → Promise<exitCode>; parseArgs(argv) → config
-src/scanner.js          → scanProject({ directory, focus, layers, ignore }) → Promise<ScanReport>
-                          scanFile({ filePath, depth: 'fast' | 'full' }) → Promise<ScanReport>
+src/scanner.js          → scanProject({ directory, deep, focus, ignore, llm, classifier, registryClient }) → Promise<ScanReport>
+                          scanFile({ filePath, depth: 'fast' | 'full', llm, classifier }) → Promise<ScanReport>
 src/layers/deterministic.js → analyzeDeterministic(code, ctx) → Finding[]
                               checkDependencies(manifest, { registryClient }) → Finding[]
 src/layers/probabilistic.js → shannonEntropy(str) → number
@@ -33,6 +33,15 @@ src/layers/probabilistic.js → shannonEntropy(str) → number
                               estimateDependencyWeight(manifest) → { package, estimatedKb }[]
 src/layers/semantic.js      → auditSemantic({ filePath, code, findings, llm }) → Finding[]
                               explainIssue({ ruleId, codeSnippet, llm }) → { explanation, patch }
+src/layers/llm.js           → createLocalEchoLlm() | createHttpLlm({baseUrl, apiKey, model, fetchImpl})
+                              isLocalUrl(url) → boolean
+                              resolveLlmConfig({flags, env, rc}) → {url, apiKey, model}
+                              loadLlm({flags, env, cwd, fetchImpl}) → llm client
+src/layers/classifier.js    → createLocalClassifier({model, task, modelLoader, threshold})
+                              classify(text) → {label, score} | classifyTokens / embed
+                              classifyStrings({strings, classifier, filePath}) → Finding[]
+                              cosineSimilarity(a, b) → number
+                              loadClassifier({flags, env, modelLoader}) → classifier | null
 src/severity.js         → classifyFinding(finding) → 'Critical' | 'High' | 'Medium' | 'Low'
                           meetsBlocking(findings, minSeverity) → boolean
 src/sanitize.js         → sanitizeSnippet(code) → { code, masked: string[] }
@@ -45,6 +54,8 @@ src/a11y.js             → checkA11y(code, ctx) → Finding[]
 src/performance.js      → checkPerformance(code, ctx) → Finding[]
 src/report/index.js     → toJson(report) → object; toSarif(report) → object; renderTerminal(report) → string
 src/mcp/server.js       → createMcpServer(deps) → { tools: string[], handleCall(name, params) }
+                          scan tools accept per-call { model, llmUrl, llmKey, classifierModel, classifierTask }
+                          and report modelsUsed: { llm, classifier }
 ```
 
 ### Finding shape
@@ -65,7 +76,8 @@ type Finding = {
 ### Injected dependencies (part of the contract)
 
 - `registryClient` — `{ exists(name) → Promise<boolean> }`; tests inject `helpers/mockRegistry.js`.
-- `llm` — `{ audit({code, findings}), explain({ruleId, codeSnippet}), provider }`; tests inject `helpers/mockLlm.js`.
+- `llm` — `{ audit({code, findings}), explain({ruleId, codeSnippet}), provider }`; tests inject `helpers/mockLlm.js` or `createHttpLlm({fetchImpl})` with a mocked fetch.
+- `classifier` — `{ classify(text), classifyTokens(text), embed(text), model, task }`; lazy `@xenova/transformers` behind `modelLoader` — never downloaded in tests.
 - `notifier` — OS notification sink injected into the watcher flow.
 - `watcherFactory` — fs-watcher factory for injectable watch events.
 

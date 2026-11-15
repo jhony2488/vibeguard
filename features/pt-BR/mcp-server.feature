@@ -62,6 +62,19 @@ Funcionalidade: Tools do servidor MCP e integração com agentes
     Quando o cliente inicia a sessão
     Então as tools MCP do VibeGuard ficam disponíveis para o agente
 
+  @models @per-call
+  Cenário: Agente seleciona o modelo LLM por chamada de tool
+    Dado que o contexto do projeto sugere um modelo ajustado para código
+    Quando o agente chama "vibeguard_scan_file" com os parâmetros "model" e "llmUrl"
+    Então o scan usa aquele endpoint compatível com OpenAI para a passada semântica
+    E a resposta lista-o em "modelsUsed.llm"
+
+  @models @per-call @classifier
+  Cenário: Agente anexa um classificador local por chamada de tool
+    Quando o agente chama "vibeguard_scan_file" com "classifierModel" e "classifierTask"
+    Então a camada probabilística inclui achados daquele modelo local
+    E a resposta lista-o em "modelsUsed.classifier"
+
   @skills @sep-2640
   Cenário: Servidor declara a extensão de skills
     Quando o cliente inspeciona as capabilities do servidor

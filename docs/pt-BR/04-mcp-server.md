@@ -45,6 +45,17 @@ O VibeGuard opera como um assistente de análise de segurança que pode ser cons
 - **Parâmetros:** `ruleId: string`, `codeSnippet: string`
 - **Função:** chama a camada semântica (LLM) para explicar por que aquele padrão "vibecodado" é um risco de segurança e gera o fix correto.
 
+### Seleção de modelo por chamada
+
+Toda tool de scan aceita parâmetros opcionais de modelo para que **o agente escolha o modelo certo para o contexto do projeto** — ex.: um token-classifier de segredos em arquivos `.env`, um modelo de embedding para varreduras por similaridade, ou um LLM ajustado para código em repositórios TypeScript:
+
+| Parâmetro | Efeito |
+| --- | --- |
+| `model` + `llmUrl` (+`llmKey`) | sobrescreve o LLM da camada semântica para aquela chamada (endpoint compatível com OpenAI) |
+| `classifierModel` + `classifierTask` | anexa um classificador HF local (`text-classification` / `token-classification` / `feature-extraction` via `@xenova/transformers`) |
+
+Cada resposta de tool inclui `modelsUsed: { llm, classifier }` para transparência. Os padrões vêm do env do servidor (`VIBEGUARD_LLM_*`, `VIBEGUARD_CLASSIFIER_*`).
+
 ## Skills Servidas (roadmap — SEP-2640)
 
 Além das tools, a extensão oficial de **Skills** do MCP (`io.modelcontextprotocol/skills`, [SEP-2640](https://modelcontextprotocol.io/seps/2640-skills-extension), Final) permite que um servidor entregue Agent Skills — diretórios contendo um `SKILL.md` mais arquivos de apoio — como resources MCP sob URIs `skill://`. Servidores implementam `skills/list` e `skills/get`; clientes leem cada arquivo via `resources/read` (e opcionalmente navegam diretórios via `resources/directory/read`).
@@ -162,7 +173,10 @@ Basta adicionar o servidor MCP no arquivo de configuração do ambiente (`mcp.js
       "command": "npx",
       "args": ["-y", "@vibeguard/mcp-server"],
       "env": {
-        "VIBEGUARD_LLM_KEY": "sua-chave-api"
+        "VIBEGUARD_LLM_URL": "https://api.openai.com",
+        "VIBEGUARD_LLM_MODEL": "gpt-4o-mini",
+        "VIBEGUARD_LLM_KEY": "sua-chave-api",
+        "VIBEGUARD_CLASSIFIER_MODEL": "hf-model-id"
       }
     }
   }
@@ -196,7 +210,7 @@ npx vibeguard check --staged --strict
 
 ## Conectando a Partir de Outros Clientes MCP
 
-O servidor MCP do VibeGuard é um servidor stdio padrão — qualquer cliente compatível com MCP pode executá-lo via `npx -y @vibeguard/mcp-server`. A variável de ambiente `VIBEGUARD_LLM_KEY` é opcional (omita ao usar um LLM local como o Ollama).
+O servidor MCP do VibeGuard é um servidor stdio padrão — qualquer cliente compatível com MCP pode executá-lo via `npx -y @vibeguard/mcp-server`. As variáveis `VIBEGUARD_LLM_*` são opcionais (omita a chave inteiramente ao usar um LLM local como o Ollama em `http://localhost:11434`); `VIBEGUARD_CLASSIFIER_MODEL` habilita a camada opcional de classificadores HF locais (requer `npm i @xenova/transformers`).
 
 | Cliente | Arquivo de configuração / método |
 | --- | --- |
