@@ -12,10 +12,10 @@ Greenfield. The repository currently contains specification/architecture documen
 
 ## Test Suite (`__tests__/`)
 
-- Jest (ESM, `node --experimental-vm-modules`), spec-first: tests import the `src/` contract documented in `__tests__/README.md` and are expected red until the implementation exists.
+- Jest (ESM, `node --experimental-vm-modules`). The `src/` contract documented in `__tests__/README.md` is implemented — keep contract doc and tests in sync when it evolves.
 - `unit/` isolates modules via injected mocks (`helpers/mockLlm.js`, `mockRegistry.js`); `integration/` covers multi-module flows (fixture project, real git repo in tmp, spawned CLI).
 - Every test carries a `// features/<file>.feature — "<scenario>"` comment tracing it back to the Gherkin spec.
-- **Do not create files under `src/` to satisfy failing tests** — the contract is defined by the docs; implementation comes later.
+- The code model is regex/heuristic-based (`src/analyzers/codeModel.js`) behind a stable interface — a real AST parser can replace it without changing layer contracts.
 
 ## Test Specifications (BDD)
 
